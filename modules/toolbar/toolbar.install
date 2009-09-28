@@ -10,7 +10,7 @@
  * Implementation of hook_install().
  *
  * @todo
- *   Implement role based shortcut bars. 
+ *   Implement role based shortcut bars.
  */
 function toolbar_install() {
   $t = get_t();
@@ -23,7 +23,8 @@ function toolbar_install() {
     ->execute();
 
   // Add starter convenience shortcuts.
-  menu_rebuild();
+  // YOU SUCK!
+  //menu_rebuild();
   $items = array(
     'node/add' => 'Add content',
     'admin/content' => 'Find content',

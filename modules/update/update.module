@@ -197,6 +197,7 @@ function update_theme() {
  * @see _update_cron_notify()
  */
 function update_requirements($phase) {
+  return;
   if ($phase == 'runtime') {
     if ($available = update_get_available(FALSE)) {
       module_load_include('inc', 'update', 'update.compare');
@@ -293,6 +294,7 @@ function _update_requirement_check($project, $type) {
  * Implement hook_cron().
  */
 function update_cron() {
+  return;
   $frequency = variable_get('update_check_frequency', 1);
   $interval = 60 * 60 * 24 * $frequency;
   // Cron should check for updates if there is no update data cached or if the
