@@ -17,13 +17,25 @@
  * Inform the system about one or more entity types (i.e., object types that
  * can be loaded via entity_load() and, optionally, to which fields can be
  * attached).
+ * Optionally one can add metadata about the properties of an entity, which is
+ * used by the DrupalEntityPropertyWrapper, see drupal_get_property_wrapper().
+ * Additional properties can be grouped by "entity tags". In turn entities
+ * having those properties should be tagged accordingly, thus the properties
+ * are automatically picked up by the property wrapper. See book_node_load() for
+ * an example of how to tag an entity.
+ * hook_datatype_info() may be used to specify per data type defaults for
+ * property info, for an example see system_datatype_info(). Apart from that
+ * modules are supposed to build upon this hook to add further entity or entity
+ * property related information.
  *
  * @see entity_load()
  * @see hook_entity_info_alter()
+ * @see drupal_get_property_wrapper()
+ * @see hook_datatype_info()
  *
  * @return
  *   An array whose keys are entity type names and whose values identify
- *   properties of those types that the  system needs to know about:
+ *   info about those types that the system needs to know about:
  *
  *   name: The human-readable name of the type.
  *   controller class: The name of the class that is used to load the objects.
@@ -65,6 +77,7 @@
  *     Keys are bundles machine names, as found in the objects' 'bundle'
  *     property (defined in the 'object keys' entry above).
  *     - label: The human-readable name of the bundle.
+ *     - description: A human-readable description of the bundle.
  *     - admin: An array of information that allow Field UI pages (currently
  *       implemented in a contributed module) to attach themselves to the
  *       existing administration pages for the bundle.
@@ -78,6 +91,42 @@
  *       - access callback: As in hook_menu(). 'user_access' will be assumed if
  *         no value is provided.
  *       - access arguments: As in hook_menu().
+ *     - 'default tags': (optional) An array of entity tags that are usually
+ *       attached to that bundle.
+ *     - properties: An array describing the properties specific to this bundle
+ *       supporting the same keys as usual entity properties below.
+ *   - properties: An array describing the properties of an entity keyed by
+ *     property name defaulting to the info specified in hook_datatype_info().
+ *     - label: The human-readable name of the property.
+ *     - description: Optionally, a human-readable description of the property.
+ *     - type: The type of the property, common types are entity types, 'text',
+ *       'integer', 'decimal' and 'date'. Multiple valued properties should use
+ *       the type 'list<anotherType>' and pass an numerical indexed array as
+ *       data. Defaults to 'text'.
+ *     - 'getter callback': A callback for retrieving the value of a property.
+ *       For an example have a look at system_get_properties().
+ *     - 'setter callback': A callback for setting the value of a property, for
+ *       an example have a look at drupal_property_verbatim_set(),
+ *     - sanitize: An optional function for sanitizing textual values. For
+ *       'text' properties without a 'getter callback' this defaults to
+ *       'check_plain'. Else this is unset as default, as usually the getter
+ *       callback cares about sanitizing too.
+ *     - formats: (optional) Specifies further formats specific to that
+ *       property, see hook_datatype_info() for details.
+ *     - 'default format': Allows overriding the usual default format per
+ *       property.
+ *     - bundle: If this property references another entity, this can be used
+ *       to specify the bundle of the referenced entity beforehand.
+ *     - tags: If this property references another entity, this can be used to
+ *       specify an array of tags of the referenced entity beforehand.
+ *   - 'default tags': (optional) An array of entity tags that are usually
+ *     attached to this entity.
+ *   - tags: An array describing all entity tags for this entity type. Keys are
+ *     the actual tag names.
+ *     - label: The human-readable name of the entity tag.
+ *     - description: A human-readable description of the entity tag.
+ *   - 'name property': Specifies the property used to get the name of an
+ *     entity. If there is a property 'name', it's used by default.
  */
 function hook_entity_info() {
   $return = array(
@@ -91,10 +140,31 @@ function hook_entity_info() {
       'bundle key' => 'type',
       // Node.module handles its own caching.
       // 'cacheable' => FALSE,
-      // Bundles must provide human readable name so
-      // we can create help and error messages about them.
-      'bundles' => node_type_get_names(),
     ),
+  );
+  // Bundles must provide a human readable name so we can create help and error
+  // messages, and the path to attach Field admin pages to.
+  foreach (node_type_get_names() as $type => $name) {
+    $return['node']['bundles'][$type] = array(
+      'label' => $name,
+      'admin' => array(
+        'path' => 'admin/structure/node-type/' . str_replace('_', '-', $type),
+        'access arguments' => array('administer content types'),
+      ),
+    );
+  }
+  // Add meta-data about the basic node properties.
+  $properties = &$return['node']['properties'];
+  
+  $properties['nid'] = array(
+    'label' => t("Node ID"),
+    'type' => 'integer',
+    'description' => t("The unique ID of the node."),
+  );
+  $properties['type-name'] = array(
+    'label' => t("Content type name"),
+    'description' => t("The human-readable name of the node type."),
+    'getter callback' => 'node_get_properties',
   );
   return $return;
 }
@@ -115,6 +185,57 @@ function hook_entity_info_alter(&$entity_info) {
   // Set the controller class for nodes to an alternate implementation of the
   // DrupalEntityController interface.
   $entity_info['node']['controller class'] = 'MyCustomNodeController';
+}
+
+/**
+ * Provides info about basic data types like ways to format it.
+ *
+ * The formats specified here can be applied using token_format(). Also any
+ * values specified here serve as defaults for properties of this datatype
+ * specified in hook_entity_info().
+ *
+ * @see hook_entity_info()
+ * @see hook_entity_info_alter()
+ * @see hook_datatype_info_alter()
+ * @see drupal_get_datatype_info()
+ * @see token_format()
+ *
+ * @return
+ *   An array describing the data type keyed by type name. Usual keys are:
+ *   - formats: An array of formats for the data type keyed by format name. Each
+ *     entry has to be an array with the possible keys:
+ *     - label: The human-readable label of the format.
+ *     - description: The human-readable descriptoin of the format.
+ *     - callback: A callback that applies the format to the value. For an
+ *       example have a look at system_format_date().
+ *   - 'default format': The name of the format which should be used be used by
+ *     default.
+ *
+ *  Further any module introducing new attributes for the property info may use
+ *  this hook to provide sane defaults.
+ */
+function hook_datatype_info() {
+  // Specify date related formats.
+  $date['medium'] = array(
+    'label' => t("Medium format"),
+    'description' => t("A date in 'medium' format. (%date)", array('%date' => format_date(REQUEST_TIME, 'medium'))),
+    'callback' => 'system_format_date',
+  );
+  // ..
+  return array('date' => array('default format' => 'medium', 'formats' => $date));
+}
+
+/**
+ * Allows altering info about basic data types.
+ *
+ * @see hook_datatype_info()
+ *
+ * @param $type_info
+ *   An array describing the data type keyed by type name, as specified in
+ *   hook_datatype_info().
+ */
+function hook_datatype_info_alter(&$type_info) {
+  $type_info['date']['default format'] = 'long';
 }
 
 /**

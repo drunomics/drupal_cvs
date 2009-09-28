@@ -723,6 +723,7 @@ function book_menu_name($bid) {
 function book_node_load($nodes, $types) {
   $result = db_query("SELECT * FROM {book} b INNER JOIN {menu_links} ml ON b.mlid = ml.mlid WHERE b.nid IN (:nids)", array(':nids' =>  array_keys($nodes)), array('fetch' => PDO::FETCH_ASSOC));
   foreach ($result as $record) {
+    $nodes[$record['nid']]->entityTags[] = 'book';
     $nodes[$record['nid']]->book = $record;
     $nodes[$record['nid']]->book['href'] = $record['link_path'];
     $nodes[$record['nid']]->book['title'] = $record['link_title'];
@@ -1244,4 +1245,47 @@ function book_menu_subtree_data($link) {
   }
 
   return $tree[$cid];
+}
+
+/**
+ * Implement hook_entity_info_alter().
+ */
+function book_entity_info_alter(&$entity_info) {
+  $entity_info['node']['tags']['book'] = array(
+    'label' => t('Book page'),
+  );
+  $entity_info['node']['default tags'][] = 'book';
+
+  $properties = &$entity_info['node']['tags']['book']['properties'];
+  $properties['book-id'] = array(
+    'label' => t("Book ID"),
+    'type' => 'integer',
+    'description' => t("The unique ID of this page's book."),
+    'getter callback' => 'book_get_properties',
+  );
+  $properties['book'] = array(
+    'label' => t("Book"),
+    'type' => 'node',
+    'description' => t("The book to which this book page belongs."),
+    'getter callback' => 'book_get_properties',
+  );
+
+}
+
+/**
+ * Callback for getting book node properties.
+ * @see book_entity_info_alter()
+ */
+function book_get_properties($node, array $options, $name, $entity_type) {
+  if (!isset($node->book['bid'])) {
+    throw new DrupalPropertyWrapperException('This node is no book page.');
+  }
+
+  switch ($name) {
+    case 'book-id':
+      return $node->book['bid'];
+
+    case 'book':
+      return node_load($node->book['bid']);
+  }
 }

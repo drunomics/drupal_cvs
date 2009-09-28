@@ -42,8 +42,8 @@
  * and 'mail' is a placeholder available for any 'user'.
  *
  * @see token_replace()
- * @see hook_tokens()
- * @see hook_token_info()
+ * @see hook_token_format_info()
+ * @see hook_entity_info()
  */
 
 /**
@@ -54,7 +54,7 @@
  * @param $data
  *   (optional) An array of keyed objects. For simple replacement scenarios
  *   'node', 'user', and others are common keys, with an accompanying node or
- *   user object being the value. Some token types, like 'site', do not require
+ *   user object being the value. Some token types, like 'system', do not require
  *   any explicit information from $data and can be replaced even if it is empty.
  * @param $options
  *   (optional) A keyed array of settings and flags to control the token
@@ -66,19 +66,21 @@
  *     tokens in a text-only email might provide a callback to strip HTML
  *     entities from token values before they are inserted into the final text.
  *   - clear: A boolean flag indicating that tokens should be removed from the
- *     final text if no replacement value can be generated.
+ *     final text if no replacement value can be generated. Defaults to TRUE.
  *   - sanitize: A boolean flag indicating that tokens should be sanitized for
  *     display to a web browser. Defaults to TRUE. Developers who set this option
  *     to FALSE assume responsibility for running filter_xss(), check_plain() or
  *     other appropriate scrubbing functions before displaying data to users.
+ * @param $types
+ *   (optional) An array assigning types to the objects of $data, keyed liked
+ *   $data. If there is no assigned type for a data object, the key specified in
+ *   $data is used as type.
  * @return
  *   Text with tokens replaced.
  */
-function token_replace($text, array $data = array(), array $options = array()) {
-  $replacements = array();
-  foreach (token_scan($text) as $type => $tokens) {
-    $replacements += token_generate($type, $tokens, $data, $options);
-  }
+function token_replace($text, array $data = array(), array $options = array(), array $types = array()) {
+  $token_list = token_scan($text);
+  $replacements = token_generate($token_list, $data, $options, $types);
 
   // Optionally alter the list of replacement values.
   if (!empty($options['callback']) && function_exists($options['callback'])) {
@@ -122,15 +124,12 @@ function token_scan($text) {
 /**
  * Generate replacement values for a list of tokens.
  *
- * @param $type
- *   The type of token being replaced. 'node', 'user', and 'date' are common.
- * @param $tokens
- *   An array of tokens to be replaced, keyed by the literal text of the token
- *   as it appeared in the source text.
+ * @param $raw_tokens
+ *   A keyed array of tokens, and their original raw form in the source text.
  * @param $data
  *   (optional) An array of keyed objects. For simple replacement scenarios
  *   'node', 'user', and others are common keys, with an accompanying node or
- *   user object being the value. Some token types, like 'site', do not require
+ *   user object being the value. Some token types, like 'system', do not require
  *   any explicit information from $data and can be replaced even if it is empty.
  * @param $options
  *   (optional) A keyed array of settings and flags to control the token
@@ -145,107 +144,89 @@ function token_scan($text) {
  *     display to a web browser. Developers who set this option to FALSE assume
  *     responsibility for running filter_xss(), check_plain() or other
  *     appropriate scrubbing functions before displaying data to users.
+ *   - clear: A boolean flag indicating that tokens should be removed from the
+ *     final text if no replacement value can be generated. Defaults to TRUE.
+ * @param $types
+ *   (optional) An array assigning types to the objects of $data, keyed liked
+ *   $data. If there is no assigned type for a data object, the key specified in
+ *   $data is used as type.
  * @return
  *   An associative array of replacement values, keyed by the original 'raw'
  *   tokens that were found in the source text. For example:
  *   $results['[node:title]'] = 'My new node';
  */
-function token_generate($type, array $tokens, array $data = array(), array $options = array()) {
+function token_generate(array $raw_tokens, array $data = array(), array $options = array(), array $types = array()) {
   $results = array();
-  $options += array('sanitize' => TRUE);
-  _token_initialize();
+  $options += array('sanitize' => TRUE, 'clear' => TRUE);
+  // Add in the current date and the global user by default.
+  $data += array('date' => REQUEST_TIME, 'current-user' => $GLOBALS['user']);
+  $types += array('current-user' => 'user');
 
-  $result = module_invoke_all('tokens', $type, $tokens, $data, $options);
-  foreach ($result as $original => $replacement) {
-    $results[$original] = $replacement;
-  }
+  foreach ($raw_tokens as $key => $tokens) {
+    $types += array($key => $key);
 
-  return $results;
-}
-
-/**
- * Given a list of tokens, return those that begin with a specific prefix.
- *
- * Used to extract a group of 'chained' tokens (such as [node:author:name]) from
- * the full list of tokens found in text. For example:
- * @code
- *   $data = array(
- *     'author:name' => '[node:author:name]',
- *     'title'       => '[node:title]',
- *     'created'     => '[node:author:name]',
- *   );
- *   $results = token_find_with_prefix($data, 'author');
- *   $results == array('name' => '[node:author:name]');
- * @endcode
- *
- * @param $tokens
- *   A keyed array of tokens, and their original raw form in the source text.
- * @param $prefix
- *   A textual string to be matched at the beginning of the token.
- * @param $delimiter
- *   An optional string containing the character that separates the prefix from
- *   the rest of the token. Defaults to ':'.
- * @return
- *   An associative array of discovered tokens, with the prefix and delimiter
- *   stripped from the key.
- */
-function token_find_with_prefix(array $tokens, $prefix, $delimiter = ':') {
-  $results = array();
-  foreach ($tokens as $token => $raw) {
-    $parts = split($delimiter, $token, 2);
-    if (count($parts) == 2 && $parts[0] == $prefix) {
-      $results[$parts[1]] = $raw;
-    }
-  }
-  return $results;
-}
-
-/**
- * Returns metadata describing supported tokens.
- *
- * The metadata array contains token type, name, and description data as well as
- * an optional pointer indicating that the token chains to another set of tokens.
- * For example:
- * @code
- *   $data['types']['node'] = array(
- *     'name' => t('Nodes'),
- *     'description' => t('Tokens related to node objects.'),
- *   );
- *   $data['tokens']['node']['title'] = array(
- *     'name' => t('Title'),
- *     'description' => t('The title of the current node.'),
- *   );
- *   $data['tokens']['node']['author'] = array(
- *     'name' => t('Author'),
- *     'description' => t('The author of the current node.'),
- *     'type' => 'user',
- *   );
- * @endcode
- * @return
- *   An associative array of token information, grouped by token type.
- */
-function token_info() {
-  $data = &drupal_static(__FUNCTION__);
-  if (!isset($data)) {
-    _token_initialize();
-    $data = module_invoke_all('token_info');
-    drupal_alter('token_info', $data);
-  }
-  return $data;
-}
-
-/**
- * Load modulename.tokens.inc for all enabled modules.
- */
-function _token_initialize() {
-  $initialized = &drupal_static(__FUNCTION__);
-  if (!$initialized) {
-    foreach (module_list() as $module) {
-      $filename = DRUPAL_ROOT . '/' . drupal_get_path('module', $module) . "/$module.tokens.inc";
-      if (file_exists($filename)) {
-        include_once $filename;
+    if (isset($data[$key]) && ($wrapper = drupal_get_property_wrapper($types[$key], $data[$key], $options))) {
+      foreach ($tokens as $token => $original) {
+        try {
+          $results[$original] = _token_get_replacement($wrapper, $token);
+        }
+        catch (DrupalPropertyWrapperException $e) {
+          // A token has not been found.
+          if ($options['clear']) {
+            $results[$original] = '';
+          }
+        }
       }
     }
-    $initialized = TRUE;
+  }
+  return $results;
+}
+
+/**
+ * Applies chained tokens by getting properties of the given wrapper.
+ */
+function _token_get_replacement(DrupalPropertyWrapperInterface $wrapper, $token) {
+  foreach (explode(':', $token) as $i => $name) {
+    $wrapper = $wrapper->$name;
+  }
+  // If no format was given apply the default just by converting it to string.
+  return (string)$wrapper;
+}
+
+
+/**
+ * Formats a token by using the formats defined in drupal_get_datatype_info().
+ *
+ * @param $value
+ *   The token value to format.
+ * @param $type
+ *   The type of the passed token.
+ * @param $format
+ *   (optional) The format to apply. If unset, the default format will be used.
+ *   If there is no default format either, the passed value is returned.
+ * @param $options
+ *   (optional) A keyed array of options. Supported are:
+ *   - language: A language object to be used when generating locale-sensitive
+ *     formats.
+ *   - absolute: Whether generated URLs should be absolute. Defaults to TRUE.
+ *   - formats: An array of additional formats to use.
+ *   - default format: May be used to override the default format.
+ * @param $context
+ *   (optional) An array of contextual information which format callbacks
+ *   can make use of. Used internally.
+ */
+function token_format($value, $type, $format = NULL, array $options = array(), array $context = array()) {
+  $info = drupal_get_datatype_info($type) + array('formats' => array(), 'default format' => NULL);
+  $options += array('language' => NULL, 'formats' => array(), 'absolute' => TRUE);
+  $formats = $options['formats'] + $info['formats'];
+  if (!isset($format)) {
+    $format = isset($options['default format']) ? $options['default format'] : $info['default format'];
+  }
+  // Now apply the format.
+  if (isset($formats[$format]['callback']) && function_exists($function = $formats[$format]['callback'])) {
+    return $function($value, $format, $options, $context);
+  }
+  elseif (!isset($format)) {
+    return $value;
   }
 }

@@ -240,6 +240,10 @@ class DrupalDefaultEntityController implements DrupalEntityControllerInterface {
         field_attach_load($this->entityType, $queried_entities);
       }
     }
+    // Initialize the entity tags array.
+    foreach ($queried_entities as $entity) {
+      $entity->entityTags = array();
+    }
 
     // Call hook_TYPE_load(). The first argument for hook_TYPE_load() are
     // always the queried entities, followed by additional arguments set in

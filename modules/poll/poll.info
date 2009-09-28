@@ -8,4 +8,3 @@ files[] = poll.module
 files[] = poll.pages.inc
 files[] = poll.install
 files[] = poll.test
-files[] = poll.tokens.inc

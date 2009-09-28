@@ -1073,6 +1073,210 @@ class SystemThemeFunctionalTest extends DrupalWebTestCase {
   }
 }
 
+/**
+ * Test entity property wrapper.
+ */
+class DrupalPropertyWrapperTestCase extends DrupalWebTestCase {
+  public static function getInfo() {
+    return array(
+      'name' => 'Property wrappers',
+      'description' => 'Test using the drupal property wrappers.',
+      'group' => 'System',
+    );
+  }
+  
+  function setUp() {
+    parent::setUp('book', 'field_test');
+    // Clear the node load cache.
+    node_load_multiple(array(), array(), TRUE);
+
+    // Add a field with multiple values for testing list properties.
+    $this->field_name = drupal_strtolower($this->randomName() . '_field_name');
+    $this->obj_type = 'node';
+    $this->field = array(
+      'field_name' => $this->field_name,
+      'type' => 'test_field',
+      'cardinality' => 4,
+      'translatable' => TRUE,
+      'settings' => array(
+        'test_hook_in' => FALSE,
+      ),
+    );
+    field_create_field($this->field);
+
+    $this->instance = array(
+      'field_name' => $this->field_name,
+      'bundle' => 'article',
+      'label' => $this->randomName() . '_label',
+      'description' => $this->randomName() . '_description',
+      'weight' => mt_rand(0, 127),
+      'settings' => array(
+        'test_instance_setting' => $this->randomName(),
+      ),
+      'widget' => array(
+        'type' => 'test_field_widget',
+        'label' => 'Test Field',
+        'settings' => array(
+          'test_widget_setting' => $this->randomName(),
+        ),
+      ),
+    );
+    field_create_instance($this->instance);
+  }
+
+  /**
+   * Creates a user and a node, then tests getting the properties.
+   */
+  function testEntityPropertyWrapper() {
+    $account = $this->drupalCreateUser();
+    // For testing sanitizing give the user a malicious user name
+    $account = user_save($account, array('name' => '<b>BadName</b>'));
+    $node = $this->drupalCreateNode(array('uid' => $account->uid, 'name' => $account->name, 'title' => '<b>Is it bold?<b>'));
+    
+    // First test without sanitizing.
+    $wrapper = drupal_get_property_wrapper('node', $node);
+    
+    $this->assertEqual($node->title, $wrapper->title, 'Getting property.');
+    $this->assertEqual($node->name, $wrapper->{'author-name'}, 'Getting property with getter callback.');
+    
+    // Test sanitized output.
+    $wrapper = drupal_get_property_wrapper('node', $node, array('sanitize' => TRUE));
+    
+    $this->assertEqual(check_plain($node->title), $wrapper->title, 'Getting sanitized property.');
+    $this->assertEqual(filter_xss($node->name), $wrapper->{'author-name'}, 'Getting sanitized property with getter callback.');
+    
+    // Test getting an not existing property
+    try {
+      echo $wrapper->dummy;
+      $this->fail('Getting an not existing property.');
+    }
+    catch (DrupalPropertyWrapperException $e) {
+      $this->pass('Getting an not existing property.');
+    }
+    
+    // Test setting.
+    $wrapper->title = 'test';
+    $this->assertEqual('test', $wrapper->title, 'Setting a property.');
+    try {
+      $wrapper->type = 'dummy';
+      $this->fail('Setting an unsupported property.');
+    }
+    catch (DrupalPropertyWrapperException $e) {
+      $this->pass('Setting an unsupported property.');
+    }
+    
+    // Test chaining
+    $this->assertEqual(check_plain($account->mail), $wrapper->author->mail, 'Testing chained usage.');
+    $this->assertEqual(filter_xss($account->name), $wrapper->author->name, 'Testing chained usage with callback and sanitizing.');
+    
+    // Test iterator
+    $type_info = entity_get_info('node');
+    $this->assertFalse(array_diff(array_keys($type_info['properties']), iterator_to_array($wrapper->getIterator())), 'Iterator is working.');
+
+  }
+  
+  /**
+   * Tests applying formats with the wrapper.
+   */
+  function testPropertyFormatWrapper() {
+    $date = REQUEST_TIME;
+    $wrapper = drupal_get_property_wrapper('date', $date);
+    
+    $this->assertEqual(format_date($date), (string)$wrapper, 'Apply the default format.');
+    $this->assertEqual(format_date($date, 'long'), $wrapper->long, 'Apply a certain format.');
+
+    // Test applying a not existing format.
+    try {
+      echo $wrapper->dummy;
+      $this->fail('Testing a not existing format.');
+    }
+    catch (DrupalPropertyWrapperException $e) {
+      $this->pass('Testing a not existing format.');
+    }
+  }
+  
+  /**
+   * Test basic field API support.
+   */
+  function testFieldPropertyWrappers() {
+    // Test the body field and so if auto-adding bundle properties works.
+    $body = array();
+    $body[FIELD_LANGUAGE_NONE][0] = array('value' => '<b>The body.</b>', 'summary' => 'The summary.');
+    $node = $this->drupalCreateNode(array('body' => $body));
+    $wrapper = drupal_get_property_wrapper('node', $node, array('sanitize' => FALSE));
+    
+    $this->assertEqual('<b>The body.</b>', $wrapper->body->get(), 'Getting body property.');
+    $this->assertEqual("<p>The summary.</p>\n", $wrapper->body, "Default field formatter applied.");
+    $this->assertEqual("The body.\n", $wrapper->body->text_plain, "Specified field formatter applied.");
+
+    $wrapper->body = "<b>The second body.</b>";
+    $this->assertEqual("The second body.\n", $wrapper->body->text_plain, "Setting a field value and reading it again.");
+  }
+  
+  /**
+   * Test supporting multi-valued fields.
+   */
+  function testListPropertyWrappers() {
+    $name = $this->field_name;
+    $values = array();
+    $values[FIELD_LANGUAGE_NONE][0] = array('value' => REQUEST_TIME);
+    $values[FIELD_LANGUAGE_NONE][1] = array('value' => strtotime('2009-09-05'));
+    $values[FIELD_LANGUAGE_NONE][2] = array('value' => strtotime('2009-08-05'));
+    
+    $node = $this->drupalCreateNode(array('type' => 'article', $name => $values, 'title' => '<b>Bold</b>'));
+    $wrapper = drupal_get_property_wrapper('node', $node, array('sanitize' => FALSE));
+    
+    $this->assertEqual(REQUEST_TIME, $wrapper->{$name}[0]->get(), 'Getting array entry.');
+    $this->assertEqual(strtotime('2009-09-05'), $wrapper->{$name}->{1}->get(), 'Getting array entry.');
+    $this->assertEqual(3, count($wrapper->{$name}->get()), 'Getting the whole array.');
+    $this->assertEqual('dummy test string|' . REQUEST_TIME, $wrapper->{$name}[0], "Default field formatter applied.");
+    $this->assertEqual(format_date(strtotime('2009-09-05'), 'short'), $wrapper->{$name}[1]->short, "Specified field formatter applied.");
+    // Test formating the whole field.
+    foreach (array(REQUEST_TIME, strtotime('2009-09-05'), strtotime('2009-08-05')) as $value) {
+      $output[] = 'dummy test string|' . $value;
+    }
+    $this->assertEqual(implode(', ', $output), (string)$wrapper->{$name}, "Multiple value default format applied.");
+    
+    // Test iterator
+    $this->assertEqual(iterator_to_array($wrapper->{$name}->getIterator()), array(0, 1, 2), 'Iterator is working.');
+    
+    // Make sure changing the array changes the actual entity property.
+    $wrapper->{$name}[0] = strtotime('2009-10-05');
+    unset($wrapper->{$name}[1], $wrapper->{$name}[2]);
+    $this->assertEqual($wrapper->{$name}->get(), array(strtotime('2009-10-05')), 'Setting multiple property values.');
+
+    // Test setting an arbitrary list item.
+    $wrapper = drupal_get_property_wrapper('list<date>', array(0 => REQUEST_TIME));
+    $wrapper[1] = strtotime('2009-09-05');
+    $this->assertEqual($wrapper->get(), array(REQUEST_TIME, strtotime('2009-09-05')), 'Setting a list item.');
+    $formatted = format_date(REQUEST_TIME) . ', ' . format_date(strtotime('2009-09-05'));
+    $this->assertEqual($formatted, (string)$wrapper, 'Formatting a list of values.');
+
+    // Test converting to string.
+    $wrapper = drupal_get_property_wrapper('list<node>', array($node, $node), array('sanitize' => TRUE));
+    $this->assertEqual((string)$wrapper, check_plain($node->title) . ', ' . check_plain($node->title), 'Test converting list to string.');
+  }
+  
+  /**
+   * Test entity tags by using the 'book' default tag of the book module.
+   */
+  function testTaggedEntities() {
+    $node = $this->drupalCreateNode(array('title' => "Book 1", 'type' => 'book'));
+    $node2 = $this->drupalCreateNode(array('title' => "Book page", 'type' => 'book', 'book' => array('bid' => $node->nid)));
+    $node3 = $this->drupalCreateNode(array('title' => "Book page", 'type' => 'book', 'book' => array('bid' => $node2->nid)));
+
+    // Test whether the tag is detected.
+    $wrapper = drupal_get_property_wrapper('node', $node2);
+    $this->assertEqual("Book 1", $wrapper->book->title, "Entity is tagged.");
+
+    // Make sure the returned book has the book properties too.
+    $wrapper = drupal_get_property_wrapper('node', $node3);
+    $this->assertEqual("Book 1", $wrapper->book->book->title, "Retrieved entity is tagged.");
+  }
+
+}
+
+
 
 /**
  * Test the basic queue functionality.
@@ -1176,7 +1380,13 @@ class TokenReplaceTestCase extends DrupalWebTestCase {
       'group' => 'System',
     );
   }
-
+  
+  function setUp() {
+    parent::setUp('book');
+    // Clear the node load cache.
+    node_load_multiple(array(), array(), TRUE);
+  }
+  
   /**
    * Creates a user and a node, then tests the tokens generated from them.
    */
@@ -1190,6 +1400,7 @@ class TokenReplaceTestCase extends DrupalWebTestCase {
     $source  = '[node:title]';         // Title of the node we passed in
     $source .= '[node:author:name]';   // Node author's name
     $source .= '[node:created:since]'; // Time since the node was created
+    $source .= '[node:changed]';       // Last update time using the default format.
     $source .= '[current-user:name]';  // Current user's name
     $source .= '[user:name]';          // No user passed in, should be untouched
     $source .= '[date:short]';         // Short date format of REQUEST_TIME
@@ -1198,24 +1409,59 @@ class TokenReplaceTestCase extends DrupalWebTestCase {
     $target  = check_plain($node->title);
     $target .= check_plain($account->name);
     $target .= format_interval(REQUEST_TIME - $node->created, 2, $language->language);
+    $target .= format_date($node->changed, 'medium');
     $target .= check_plain($user->name);
     $target .= '[user:name]';
     $target .= format_date(REQUEST_TIME, 'short', '', NULL, $language->language);
     $target .= '[bogus:token]';
 
-    $result = token_replace($source, array('node' => $node), array('language' => $language));
+    $result = token_replace($source, array('node' => $node), array('language' => $language, 'clear' => FALSE));
+    $this->assertFalse(strcmp($target, $result), t('Basic placeholder tokens replaced.'));
 
     // Check that the results of token_generate are sanitized properly. This does NOT
     // test the cleanliness of every token -- just that the $sanitize flag is being
     // passed properly through the call stack and being handled correctly by a 'known'
     // token, [node:title].
-    $this->assertFalse(strcmp($target, $result), t('Basic placeholder tokens replaced.'));
-    
-    $raw_tokens = array('title' => '[node:title]');
-    $generated = token_generate('node', $raw_tokens, array('node' => $node));
+    $raw_tokens = array('node' => array('title' => '[node:title]'));
+    $generated = token_generate($raw_tokens, array('node' => $node));
     $this->assertFalse(strcmp($generated['[node:title]'], check_plain($node->title)), t('Token sanitized.'));
 
-    $generated = token_generate('node', $raw_tokens, array('node' => $node), array('sanitize' => FALSE));
+    $generated = token_generate($raw_tokens, array('node' => $node), array('sanitize' => FALSE));
     $this->assertFalse(strcmp($generated['[node:title]'], $node->title), t('Unsanitized token generated properly.'));
+  }
+
+  
+  /**
+   * Tests using bundle/tag specific tokens and specifying custom data types.
+   */
+  function testContextualTokens() {
+    // Create the initial objects.
+    $body[FIELD_LANGUAGE_NONE][0] = array('value' => '<b>The body.</b>');
+    $node = $this->drupalCreateNode(array('title' => "Book 1", 'type' => 'book', 'body' => $body));
+    $node2 = $this->drupalCreateNode(array('title' => "Book page", 'type' => 'book', 'book' => array('bid' => $node->nid)));
+ 
+    // Test body, which is bundle specific.
+    $source  = '[node:body]';
+    // Test book tokens, which is specific to nodes tagged as "book".
+    $source .= '[bookpage:book:title]';
+
+    $target  = "<p>The body.</p>\n";
+    $target .= "Book 1";
+
+    $result = token_replace($source, array('node' => $node, 'bookpage' => $node2), array(), array('bookpage' => 'node'));
+    $this->assertFalse(strcmp($target, $result), t('Contextual placeholder tokens replaced.'));
+  }
+  
+  /**
+   * Test multiple value tokens by using tags.
+   */
+  function testMultipleValueTokens() {
+    // Use the auto-created tags vocabulary.
+    $edit['taxonomy']['tags'][1] = '<b>tag1, tag2</b>';
+    $node = $this->drupalCreateNode($edit + array('type' => 'article'));
+    // Load from db to get the usual taxonomy structure.
+    $node = node_load($node->nid);
+    $result = token_replace('Tags: [node:taxonomy] - [node:taxonomy:0]', array('node' => $node));
+    $this->assertEqual(check_plain('Tags: <b>tag1, tag2</b> - <b>tag1'), $result, 'Multiple value tokens replaced.');
   }
 }

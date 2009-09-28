@@ -64,7 +64,7 @@ function field_test_entity_info() {
   $bundles = variable_get('field_test_bundles', array('test_bundle' => array('label' => 'Test Bundle')));
   return array(
     'test_entity' => array(
-      'name' => t('Test Entity'),
+      'label' => t('Test Entity'),
       'object keys' => array(
         'id' => 'ftid',
         'revision' => 'ftvid',
@@ -76,7 +76,7 @@ function field_test_entity_info() {
     ),
     // This entity type doesn't get form handling for now...
     'test_cacheable_entity' => array(
-      'name' => t('Test Entity, cacheable'),
+      'label' => t('Test Entity, cacheable'),
       'object keys' => array(
         'id' => 'ftid',
         'revision' => 'ftvid',
@@ -358,6 +358,8 @@ function field_test_field_info() {
       ),
       'default_widget' => 'test_field_widget',
       'default_formatter' => 'field_test_default',
+      // For testing the property wrapper we map this to dates.
+      'property_type' => 'date',
     ),
   );
 }
@@ -379,7 +381,7 @@ function field_test_field_schema($field) {
     'columns' => array(
       'value' => array(
         'type' => 'int',
-        'size' => 'tiny',
+        'size' => 'big',
         'not null' => FALSE,
       ),
     ),

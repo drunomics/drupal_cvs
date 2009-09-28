@@ -411,3 +411,48 @@ function statistics_ranking() {
 function statistics_update_index() {
   variable_set('node_cron_views_scale', 1.0 / max(1, db_query('SELECT MAX(totalcount) FROM {node_counter}')->fetchField()));
 }
+
+/**
+ * Implement hook_entity_info_alter().
+ */
+function statistics_entity_info_alter(&$entity_info) {
+  $properties = &$entity_info['node']['properties'];
+
+  $properties['views'] = array(
+    'label' => t("Number of views"),
+    'description' => t("The number of visitors who have read the node."),
+    'type' => 'integer',
+    'getter callback' => 'statistics_node_get_properties',
+  );
+  $properties['day-views'] = array(
+    'label' => t("Views today"),
+    'description' => t("The number of visitors who have read the node today."),
+    'type' => 'integer',
+    'getter callback' => 'statistics_node_get_properties',
+  );
+  $properties['last-view'] = array(
+    'label' => t("Last view"),
+    'description' => t("The date on which a visitor last read the node."),
+    'type' => 'date',
+    'getter callback' => 'statistics_node_get_properties',
+  );
+}
+
+/**
+ * Callback for getting statistics properties.
+ * @see statistics_entity_info_alter()
+ */
+function statistics_node_get_properties($node, array $options, $name) {
+  $statistics = statistics_get($node->nid);
+
+  switch ($name) {
+    case 'views':
+      return $statistics['totalviews'];
+
+    case 'day-views':
+      return $statistics['dayviews'];
+
+    case 'last-view':
+      return $statistics['timestamp'];
+  }
+}

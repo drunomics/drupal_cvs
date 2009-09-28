@@ -66,7 +66,7 @@ function field_default_view($obj_type, $object, $field, $instance, $langcode, $i
 
   if ($display['type'] !== 'hidden') {
     $theme = 'field_formatter_' . $display['type'];
-    $single = (field_behaviors_formatter('multiple values', $display) == FIELD_BEHAVIOR_DEFAULT);
+    $single = (field_behaviors_formatter('multiple values', $display['type']) == FIELD_BEHAVIOR_DEFAULT);
 
     $label_display = $display['label'];
     if ($build_mode == 'search_index') {

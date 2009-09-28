@@ -9,4 +9,3 @@ files[] = statistics.admin.inc
 files[] = statistics.pages.inc
 files[] = statistics.install
 files[] = statistics.test
-files[] = statistics.tokens.inc

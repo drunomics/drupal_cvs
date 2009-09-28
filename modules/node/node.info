@@ -10,5 +10,5 @@ files[] = node.admin.inc
 files[] = node.pages.inc
 files[] = node.install
 files[] = node.test
-files[] = node.tokens.inc
+files[] = node.entity.inc
 required = TRUE

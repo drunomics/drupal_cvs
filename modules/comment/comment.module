@@ -96,37 +96,6 @@ function comment_help($path, $arg) {
 }
 
 /**
- * Implement hook_entity_info() {
- */
-function comment_entity_info() {
-  $return =  array(
-    'comment' => array(
-      'label' => t('Comment'),
-      'base table' => 'comment',
-      'fieldable' => TRUE,
-      'controller class' => 'CommentController',
-      'object keys' => array(
-        'id' => 'cid',
-        'bundle' => 'node_type',
-      ),
-      'bundle keys' => array(
-        'bundle' => 'type',
-      ),
-      'bundles' => array(),
-      'static cache' => FALSE,
-    ),
-  );
-
-  foreach (node_type_get_names() as $type => $name) {
-    $return['comment']['bundles']['comment_node_' . $type] = array(
-      'label' => $name,
-    );
-  }
-
-  return $return;
-}
-
-/**
  * Implement hook_theme().
  */
 function comment_theme() {
@@ -2430,3 +2399,62 @@ function comment_filter_format_delete($format, $fallback) {
     ->execute();
 }
 
+/**
+ * Callback for getting comment properties.
+ * @see comment_entity_info()
+ */
+function comment_get_properties($comment, array $options, $name) {
+  switch ($name) {
+    case 'name':
+      $name = ($comment->uid == 0) ? variable_get('anonymous', t('Anonymous')) : $comment->name;
+      return $options['sanitize'] ? filter_xss($name) : $name;
+
+    case 'mail':
+      if ($comment->uid != 0) {
+        $account = user_load($comment->uid);
+        $mail = $account->mail;
+      }
+      else {
+        $mail = $comment->mail;
+      }
+      return $options['sanitize'] ? check_plain($mail) : $mail;
+
+    case 'title':
+      return $options['sanitize'] ? filter_xss($comment->subject) : $comment->subject;
+
+    case 'body':
+      return $options['sanitize'] ? check_markup($comment->comment, $comment->format) : $comment->comment;
+
+    case 'url':
+      return url('comment/' . $comment->cid, array('fragment' => 'comment-' . $comment->cid) + $options);
+
+    case 'edit-url':
+      return url('comment/edit/' . $comment->cid, $options);
+    
+    case 'node':
+      return node_load($comment->nid);
+      
+    case 'parent':
+      if ($parent = comment_load($comment->pid)) {
+        return $parent;
+      }
+      throw new DrupalPropertyWrapperException('This comment has no parent comment.');
+
+    case 'author':
+      return user_load($comment->uid);
+  }
+}
+
+/**
+ * Callback for getting node properties.
+ * @see comment_entity_info_alter()
+ */
+function comment_get_node_properties($node, array $options, $name) {
+  switch ($name) {
+    case 'comment-count':
+      return $node->comment_count;
+
+    case 'comment-count-new':
+      return comment_num_new($node->nid);
+  }
+}

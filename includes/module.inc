@@ -175,11 +175,17 @@ function module_load_include($type, $module, $name = NULL) {
 /**
  * Load an include file for each of the modules that have been enabled in
  * the system table.
+ *
+ * @param $type
+ *   The include file's type (file extension).
+ * @param $name
+ *   Optionally, specify the base file name to include "$module.$name.$type".
+ *   If not set, "$module.$type" is used.
  */
 function module_load_all_includes($type, $name = NULL) {
-  $modules = module_list();
-  foreach ($modules as $module) {
-    module_load_include($type, $module, $name);
+  $name = isset($name) ? '.' . $name : '';
+  foreach (module_list() as $module) {
+    module_load_include($type, $module, $module . $name);
   }
 }
 

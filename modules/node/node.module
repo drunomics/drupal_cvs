@@ -174,42 +174,6 @@ function node_cron() {
 }
 
 /**
- * Implement hook_entity_info().
- */
-function node_entity_info() {
-  $return = array(
-    'node' => array(
-      'label' => t('Node'),
-      'controller class' => 'NodeController',
-      'base table' => 'node',
-      'revision table' => 'node_revision',
-      'fieldable' => TRUE,
-      'object keys' => array(
-        'id' => 'nid',
-        'revision' => 'vid',
-        'bundle' => 'type',
-      ),
-      // Node.module handles its own caching.
-      // 'cacheable' => FALSE,
-      'bundles' => array(),
-    ),
-  );
-  // Bundles must provide a human readable name so we can create help and error
-  // messages, and the path to attach Field admin pages to.
-  foreach (node_type_get_names() as $type => $name) {
-    $return['node']['bundles'][$type] = array(
-      'label' => $name,
-      'admin' => array(
-        'path' => 'admin/structure/types/manage/' . str_replace('_', '-', $type),
-        'access arguments' => array('administer content types'),
-      ),
-    );
-  }
-  return $return;
-}
-
-
-/**
  * Implement hook_field_build_modes().
  */
 function node_field_build_modes($obj_type) {
@@ -3059,6 +3023,32 @@ function node_requirements($phase) {
     'description' => $description . ' ' . l(t('Rebuild permissions'), 'admin/reports/status/rebuild'),
   );
   return $requirements;
+}
+
+/**
+ * Callback for getting node properties.
+ * @see node_entity_info()
+ */
+function node_get_properties($node, array $options, $name, $entity_type) {
+
+  switch ($name) {
+    case 'type-name':
+      $type_name = node_type_get_name($node->type);
+      return $options['sanitize'] ? check_plain($type_name) : $type_name;
+
+    case 'url':
+      return url('node/' . $node->nid, $options);
+
+    case 'edit-url':
+      return url('node/' . $node->nid . '/edit', $options);
+
+    case 'author-name':
+      $name = ($node->uid == 0) ? variable_get('anonymous', t('Anonymous')) : $node->name;
+      return $options['sanitize'] ? filter_xss($name) : $name;
+      
+    case 'author':
+      return user_load($node->uid);
+  }
 }
 
 /**

@@ -893,3 +893,71 @@ function poll_user_cancel($edit, $account, $method) {
   }
 }
 
+/**
+ * Implement hook_entity_info_alter().
+ */
+function poll_entity_info_alter(&$entity_info) {
+  $properties = &$entity_info['node']['bundles']['poll']['properties'];
+
+  $properties['poll-votes'] = array(
+    'label' => t("Poll votes"),
+    'description' => t("The number of votes that have been cast on a poll node."),
+    'type' => 'integer',
+  );
+  $properties['poll-winner'] = array(
+    'label' => t("Poll winner"),
+    'description' => t("The winning poll answer."),
+  );
+  $properties['poll-winner-votes'] = array(
+    'label' => t("Poll winner votes"),
+    'description' => t("The number of votes received by the winning poll answer."),
+    'type' => 'integer',
+  );
+  $properties['poll-winner-percent'] = array(
+    'label' => t("Poll winner percent"),
+    'description' => t("The percentage of votes received by the winning poll answer."),
+  );
+  $properties['poll-duration'] = array(
+    'label' => t("Poll duration"),
+    'description' => t("The length of time the poll node is set to run."),
+  );
+}
+
+/**
+ * Callback for getting poll properties.
+ * @see poll_entity_info_alter()
+ */
+function poll_node_get_properties($node, array $options, $name) {
+  $total_votes = 0;
+  $highest_votes = 0;
+  foreach ($node->choice as $choice) {
+    if ($choice['chvotes'] > $highest_votes) {
+      $winner = $choice;
+      $highest_votes = $choice['chvotes'];
+    }
+    $total_votes = $total_votes + $choice['chvotes'];
+  }
+
+  switch ($name) {
+    case 'poll-votes':
+      return $total_votes;
+
+    case 'poll-winner-votes':
+      return isset($winner) ? $winner['chvotes'] : 0;
+
+    case 'poll-winner':
+      if (isset($winner)) {
+        return $options['sanitize'] ? filter_xss($winner['chtext']) : $winner['chtext'];
+      }
+      throw new DrupalPropertyWrapperException('There is no poll winner yet.');
+
+    case 'poll-winner-percent':
+      if (isset($winner)) {
+        return number_format(($winner['chvotes'] / $total_votes) * 100, 0);
+      }
+      throw new DrupalPropertyWrapperException('There is no poll winner yet.');
+
+    case 'poll-duration':
+      return format_interval($node->runtime, 1, isset($options['language']) ? $options['language']->language : NULL);
+  }
+}

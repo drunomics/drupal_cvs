@@ -5533,6 +5533,34 @@ function drupal_check_incompatibility($v, $current_version) {
 }
 
 /**
+ * Returns some metadata about basic data types.
+ *
+ * @param $type
+ *   The type, e.g. date, for which the info shall be returned, or NULL
+ *   to return an array with info about all types.
+ *
+ * @see hook_datatype_info()
+ * @see hook_datatype_info_alter()
+ */
+function drupal_get_datatype_info($type = NULL) {
+  $data = &drupal_static(__FUNCTION__);
+  if (!isset($data)) {
+    if ($cache = cache_get('datatype_info')) {
+      $data = $cache->data;
+    }
+    else {
+      $data = module_invoke_all('datatype_info');
+      drupal_alter('datatype_info', $data);
+      cache_set('datatype_info', $data);
+    }
+  }
+  if (!empty($type)) {
+    return isset($data[$type]) ? $data[$type] : array();
+  }
+  return $data;
+}
+
+/**
  * Get the entity info array of an entity type.
  *
  * @see hook_entity_info()
@@ -5551,6 +5579,7 @@ function entity_get_info($entity_type = NULL) {
       $entity_info = $cache->data;
     }
     else {
+      module_load_all_includes('inc', 'entity');
       $entity_info = module_invoke_all('entity_info');
       // Merge in default values.
       foreach ($entity_info as $name => $data) {
@@ -5649,3 +5678,42 @@ function xmlrpc($url) {
   return call_user_func_array('_xmlrpc', $args);
 }
 
+/**
+ * Returns a property wrapper for the given data.
+ *
+ * Dependend on the data type either a DrupalEntityPropertyWrapper or a
+ * DrupalPropertyValueWrapper is returned.
+ *
+ * @param $type
+ *   The type of the passed data.
+ * @param $data
+ *   The data to wrap.
+ * @param $options
+ *   (optional) A keyed array of options. The supported options vary by class.
+ * @param $context
+ *   (optional) An array of contextual information which format callbacks can
+ *   make use of.
+ * @return
+ *   An instance of the DrupalPropertyWrapperInterface.
+ */
+function drupal_get_property_wrapper($type, $data, array $options = array(), $context = array()) {
+  if (($entity_info = entity_get_info()) && isset($entity_info[$type])) {
+    return new DrupalEntityPropertyWrapper($type, $data, $options, $context);
+  }
+  else {
+    return new DrupalPropertyValueWrapper($type, $data, $options, $context);
+  }
+}
+
+/**
+ * Extracts the contained type for a list type string like list<date>.
+ *
+ * @return
+ *   The contained type or FALSE, if the given type string is no list.
+ */
+function drupal_list_extract_type($type) {
+  if (strpos($type, 'list<') === 0 && $type[strlen($type)-1] == '>') {
+    return substr($type, 5, -1);
+  }
+  return FALSE;
+}

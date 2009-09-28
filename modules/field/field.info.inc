@@ -27,6 +27,8 @@ function field_info_cache_clear() {
   _field_info_collate_types(TRUE);
   drupal_static_reset('field_build_modes');
   _field_info_collate_fields(TRUE);
+  drupal_static_reset('entity_get_info');
+  cache_clear_all('entity_info', 'cache');
 }
 
 /**
@@ -140,6 +142,7 @@ function _field_info_collate_types($reset = FALSE) {
       drupal_alter('field_storage_info', $info['storage types']);
 
       // Populate information about 'fieldable' entities.
+      module_load_all_includes('inc', 'entity');
       foreach (module_implements('entity_info') as $module) {
         $entities = (array) module_invoke($module, 'entity_info');
         foreach ($entities as $name => $entity_info) {
@@ -166,6 +169,12 @@ function _field_info_collate_types($reset = FALSE) {
         }
       }
       drupal_alter('entity_info', $info['fieldable types']);
+      // Remove all not fieldable types added by drupal alter.
+      foreach ($info['fieldable types'] as $name => $entity_info) {
+        if (empty($entity_info['fieldable'])) {
+          unset($info['fieldable types'][$name]);
+        }
+      }
 
       cache_set('field_info_types', $info, 'cache_field');
     }
@@ -344,15 +353,15 @@ function field_behaviors_widget($op, $instance) {
  *  @param $op
  *    The name of the operation.
  *    Currently supported: 'multiple values'
- *  @param $display
- *    The $instance['display'][$build_mode] array.
+ *  @param $formatter_type
+ *    The formatter type.
  *  @return
  *    FIELD_BEHAVIOR_NONE    - do nothing for this operation.
  *    FIELD_BEHAVIOR_CUSTOM  - use the formatter's callback function.
  *    FIELD_BEHAVIOR_DEFAULT - use field module default behavior.
  */
-function field_behaviors_formatter($op, $display) {
-  $info = field_info_formatter_types($display['type']);
+function field_behaviors_formatter($op, $formatter_type) {
+  $info = field_info_formatter_types($formatter_type);
   return isset($info['behaviors'][$op]) ? $info['behaviors'][$op] : FIELD_BEHAVIOR_DEFAULT;
 }
 
@@ -514,7 +523,7 @@ function field_info_bundle_entity($bundle) {
  */
 function field_info_fields() {
   $info = _field_info_collate_fields();
-  return $info['fields'];
+  return isset($info['fields']) ? $info['fields'] : array();
 }
 
 /**
@@ -649,6 +658,158 @@ function field_info_formatter_settings($type) {
 function field_info_storage_settings($type) {
   $info = field_info_storage_types($type);
   return isset($info['settings']) ? $info['settings'] : array();
+}
+
+/**
+ * Implement hook_entity_info_alter().
+ *
+ * Add metadata about all properties provided by fields.
+ */
+function field_entity_info_alter(&$entity_info) {
+  // Loop over all field instance and add them as property.
+  foreach (field_info_fields() as $field_name => $field) {
+    $field += array('bundles' => array());
+    $field_type = field_info_field_types($field['type']) + array('property_callbacks' => array());
+    // Add in our default callback as the first one.
+    array_unshift($field_type['property_callbacks'], 'field_default_property_callback');
+
+    foreach ($field['bundles'] as $bundle) {
+      $instance = field_info_instance($field_name, $bundle);
+      if (empty($instance['deleted']) && $entity_type = field_info_bundle_entity($bundle)) {
+        foreach ($field_type['property_callbacks'] as $callback) {
+          $callback($entity_info, $entity_type, $field, $instance, $field_type);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Callback to add in property info per field instance.
+ * @see field_entity_info_alter().
+ */
+function field_default_property_callback(&$entity_info, $entity_type, $field, $instance, $field_type) {
+  if (!empty($field_type['property_type'])) {
+    $is_list = ($field['cardinality'] > 1);
+    if ($is_list) {
+      $field_type['property_type'] = 'list<' . $field_type['property_type'] . '>';
+    }
+    // Add in instance specific property info, if given and apply defaults.
+    $property = &$entity_info[$entity_type]['bundles'][$instance['bundle']]['properties'][$field['field_name']];
+    $instance += array('property info' => array());
+    $property = $instance['property info'] + array(
+      'label' => $instance['label'],
+      'type' => $field_type['property_type'],
+      'description' => $instance['description'],
+      'getter callback' => $is_list ? 'field_property_get_multiple' : 'field_property_get',
+      'setter callback' => $is_list ? 'field_property_set_multiple' : 'field_property_set',
+    );
+
+    // Add in compatible formatters.
+    foreach (field_info_formatter_types() as $name => $formatter) {
+      if (in_array($field['type'], $formatter['field types'])) {
+        $format = array(
+          'label' => $formatter['label'],
+          'callback' => 'field_format_property',
+        );
+        // Care for multiple values formatters vs single values formatters.
+        $single = (field_behaviors_formatter('multiple values', $name) == FIELD_BEHAVIOR_DEFAULT);
+        if (!$is_list || !$single) {
+          $property['formats'][$name] = $format;
+        }
+        elseif ($is_list && $single) {
+          $property['item']['formats'][$name] = $format;
+        }
+      }
+    }
+    if (isset($property['item']['formats'][$field_type['default_formatter']])) {
+      $property['item']['default format'] = $field_type['default_formatter'];
+    }
+    elseif (isset($property['formats'][$field_type['default_formatter']])) {
+      $property['default format'] = $field_type['default_formatter'];
+    }
+  }
+}
+
+/**
+ * Callback for applying custom property formats.
+ */
+function field_format_property($value, $formatter_type, array $options, array $context) {
+  $field_name = $context['property'];
+  $langcode = _field_property_get_langcode($context['entity'], $options, $field_name);
+  $single = (field_behaviors_formatter('multiple values', $formatter_type) == FIELD_BEHAVIOR_DEFAULT);
+  $delta = isset($context['delta']) ? $context['delta'] : 0;
+  $item = $single ? $context['entity']->{$field_name}[$langcode][$delta] : $context['entity']->$field_name;
+  $field = field_info_field($field_name);
+  return field_format($context['entity type'], $context['entity'], $field, $langcode, $item, $formatter_type);
+}
+
+/**
+ * Callback for getting field property values.
+ */
+function field_property_get($object, array $options, $name, $obj_type) {
+  $langcode = _field_property_get_langcode($object, $options, $name);
+  if ($options['sanitize'] && !isset($object->{$name}[$langcode][0]['safe'])) {
+    _field_refresh_sanitized_values($object, $obj_type, $name, $langcode);
+  }
+  return $options['sanitize'] ? $object->{$name}[$langcode][0]['safe'] : $object->{$name}[$langcode][0]['value'];
+}
+
+/**
+ * Callback for getting multiple field property values.
+ */
+function field_property_get_multiple($object, array $options, $name, $obj_type) {
+  $langcode = _field_property_get_langcode($object, $options, $name);
+  $values = array();
+  if (isset($object->{$name}[$langcode])) {
+    if ($options['sanitize'] && !isset($object->{$name}[$langcode][0]['safe'])) {
+      _field_refresh_sanitized_values($object, $obj_type, $name, $langcode);
+    }
+    foreach ($object->{$name}[$langcode] as $key => $data) {
+      $values[$key] = $options['sanitize'] ? $data['safe'] : $data['value'];
+    }
+  }
+  return $values;
+}
+
+
+function _field_property_get_langcode($object, $options, $name) {
+  $langcode = FIELD_LANGUAGE_NONE;
+  if (isset($options['language']) && isset($object->{$name}[$options['language']->language])) {
+    $langcode = $options['language']->language;
+  }
+  return $langcode;
+}
+
+function _field_refresh_sanitized_values($object, $obj_type, $field_name, $langcode) {
+  $field = field_info_field($field_name);
+  list($id, $vid, $bundle) = field_extract_ids($obj_type, $object);
+  $instance = field_info_instance($field_name, $bundle);
+
+  $function = $field['module'] . '_field_sanitize';
+  if (function_exists($function)) {
+    $function($obj_type, $object, $field, $instance, $langcode, $object->{$field_name}[$langcode]);
+  }
+}
+
+/**
+ * Callback for setting field property values.
+ */
+function field_property_set(&$object, $name, $value, $obj_type) {
+  $langcode = array_shift(array_keys($object->$name));
+  $object->{$name}[$langcode][0]['value'] = $value;
+  unset($object->{$name}[$langcode][0]['safe']);
+}
+
+/**
+ * Callback for setting multiple field property values.
+ */
+function field_property_set_multiple(&$object, $name, $values, $obj_type) {
+  $langcode = array_shift(array_keys($object->$name));
+  $object->{$name}[$langcode] = array();
+  foreach ($values as $key => $value) {
+    $object->{$name}[$langcode][$key]['value'] = $value;
+  }
 }
 
 /**

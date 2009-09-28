@@ -19,50 +19,6 @@ function taxonomy_permission() {
 }
 
 /**
- * Implement hook_entity_info().
- */
-function taxonomy_entity_info() {
-  $return = array(
-    'taxonomy_term' => array(
-      'label' => t('Taxonomy term'),
-      'controller class' => 'TaxonomyTermController',
-      'base table' => 'taxonomy_term_data',
-      'fieldable' => TRUE,
-      'object keys' => array(
-        'id' => 'tid',
-        'bundle' => 'vocabulary_machine_name',
-      ),
-      'bundle keys' => array(
-        'bundle' => 'machine_name',
-      ),
-      'bundles' => array(),
-    ),
-  );
-  foreach (taxonomy_vocabulary_get_names() as $machine_name => $vocabulary) {
-    $return['taxonomy_term']['bundles'][$machine_name] = array(
-      'label' => $vocabulary->name,
-      'admin' => array(
-        'path' => 'admin/structure/taxonomy/%taxonomy_vocabulary',
-        'real path' => 'admin/structure/taxonomy/' . $vocabulary->vid,
-        'bundle argument' => 3,
-        'access arguments' => array('administer taxonomy'),
-      ),
-    );
-  }
-  $return['taxonomy_vocabulary'] = array(
-    'label' => t('Taxonomy vocabulary'),
-    'controller class' => 'TaxonomyVocabularyController',
-    'base table' => 'taxonomy_vocabulary',
-    'object keys' => array(
-      'id' => 'vid',
-    ),
-    'fieldable' => FALSE,
-  );
-
-  return $return;
-}
-
-/**
  * Implement hook_field_build_modes();
  *
  * @TODO: build mode for display as a field (when attached to nodes etc.).
@@ -432,6 +388,23 @@ function taxonomy_check_vocabulary_hierarchy($vocabulary, $changed_term) {
 }
 
 /**
+ * Callback for getting vocabulary properties.
+ * @see taxonomy_entity_info()
+ */
+function taxonomy_vocabulary_get_properties($vocabulary, array $options, $name) {
+
+  switch ($name) {
+    case 'node-count':
+      $sql = "SELECT COUNT (1) FROM {taxonomy_term_node} tn LEFT JOIN {taxonomy_term_data} td ON tn.tid = td.tid WHERE td.vid = :vid";
+      return db_query($sql, array(':vid' => $vocabulary->vid))->fetchField();
+
+    case 'term-count':
+      $sql = "SELECT COUNT (1) FROM {taxonomy_term_data} td WHERE td.vid = :vid";
+      return db_query($sql, array(':vid' => $vocabulary->vid))->fetchField();
+  }
+}
+
+/**
  * Save a term object to the database.
  *
  * @param $term
@@ -572,6 +545,28 @@ function taxonomy_term_delete($tid) {
   taxonomy_terms_static_reset();
 
   return SAVED_DELETED;
+}
+
+/**
+ * Callback for getting term properties.
+ * @see taxonomy_entity_info()
+ */
+function taxonomy_term_get_properties($term, array $options, $name) {
+
+  switch ($name) {
+    case 'node-count':
+      $sql = "SELECT COUNT (1) FROM {taxonomy_term_node} tn WHERE tn.tid = :tid";
+      return db_query($sql, array(':tid' => $term->tid))->fetchField();
+
+    case 'url':
+      return url(taxonomy_term_path($term), $options);
+
+    case 'vocabulary':
+      return taxonomy_vocabulary_load($term->vid);
+
+    case 'parent':
+      return array_pop(taxonomy_get_parents($term->tid));
+  }
 }
 
 /**

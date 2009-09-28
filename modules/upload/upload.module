@@ -270,6 +270,7 @@ function upload_file_load($files) {
   // Add the upload specific data into the file object.
   $result = db_query('SELECT * FROM {upload} u WHERE u.fid IN (:fids)', array(':fids' => array_keys($files)))->fetchAll(PDO::FETCH_ASSOC);
   foreach ($result as $record) {
+    $files[$record['fid']]->entityTags[] = 'attachment';
     foreach ($record as $key => $value) {
       $files[$record['fid']]->$key = $value;
     }
@@ -631,6 +632,50 @@ function theme_upload_form_new($form) {
   drupal_add_tabledrag('upload-attachments', 'order', 'sibling', 'upload-weight');
   $output = drupal_render_children($form);
   return $output;
+}
+
+/**
+ * Implement hook_entity_info_alter().
+ */
+function upload_entity_info_alter(&$entity_info) {
+  $entity_info['file']['tags']['attachment'] = array(
+    'label' => t('Upload attachment'),
+    'properties' => array(),
+  );
+  $properties = &$entity_info['file']['tags']['attachment']['properties'];
+  
+  $properties['nid'] = array(
+    'label' => t("Node ID"),
+    'description' => t("The unique ID of the node the file is attached to."),
+  );
+  $properties['node'] = array(
+    'label' => t("Node"),
+    'description' => t("The node the file is attached to."),
+    'type' => 'node',
+    'getter callback' => 'upload_file_get_node',
+  );
+  $properties['description'] = array(
+    'label' => t("Description"),
+    'description' => t("An optional human-readable description of the file."),
+  );
+
+  $entity_info['node']['properties']['files'] = array(
+    'label' => t('File attachment'),
+    'description' => t('Files attached to a node, if any.'),
+    'type' => 'list<file>',
+    'tags' => array('attachment'),
+    'getter callback' => 'drupal_property_get_list',
+  );
+}
+
+/**
+ * Gets the node associated to an uploaded file.
+ *
+ * @return
+ *   The associated node object.
+ */
+function upload_file_get_node($file) {
+  return node_load($file->nid);
 }
 
 /**

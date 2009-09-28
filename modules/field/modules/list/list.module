@@ -17,6 +17,7 @@ function list_field_info() {
       'settings' => array('allowed_values' => '', 'allowed_values_function' => ''),
       'default_widget' => 'options_select',
       'default_formatter' => 'list_default',
+      'property_type' => 'integer',
     ),
     'list_boolean' => array(
       'label' => t('Boolean'),
@@ -24,6 +25,7 @@ function list_field_info() {
       'settings' => array('allowed_values' => '', 'allowed_values_function' => ''),
       'default_widget' => 'options_select',
       'default_formatter' => 'list_default',
+      'property_type' => 'boolean',
     ),
     'list_number' => array(
       'label' => t('List (numeric)'),
@@ -31,6 +33,7 @@ function list_field_info() {
       'settings' => array('allowed_values' => '', 'allowed_values_function' => ''),
       'default_widget' => 'options_select',
       'default_formatter' => 'list_default',
+      'property_type' => 'decimal',
     ),
     'list_text' => array(
       'label' => t('List (text)'),
@@ -38,6 +41,7 @@ function list_field_info() {
       'settings' => array('allowed_values' => '', 'allowed_values_function' => ''),
       'default_widget' => 'options_select',
       'default_formatter' => 'list_default',
+      'property_type' => 'text',
     ),
   );
 }

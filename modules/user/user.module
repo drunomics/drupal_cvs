@@ -84,30 +84,21 @@ function user_theme() {
 }
 
 /**
- * Implement hook_entity_info().
+ * Callback for getting user properties.
+ * @see user_entity_info()
  */
-function user_entity_info() {
-  $return = array(
-    'user' => array(
-      'label' => t('User'),
-      'controller class' => 'UserController',
-      'base table' => 'users',
-      'fieldable' => TRUE,
-      'object keys' => array(
-        'id' => 'uid',
-      ),
-      'bundles' => array(
-        'user' => array(
-          'label' => t('User'),
-          'admin' => array(
-            'path' => 'admin/config/people/accounts',
-            'access arguments' => array('administer users'),
-          ),
-        ),
-      ),
-    ),
-  );
-  return $return;
+function user_get_properties($account, array $options, $name, $entity_type) {
+  switch ($name) {
+    case 'name':
+      $name = ($account->uid == 0) ? variable_get('anonymous', t('Anonymous')) : $account->name;
+      return $options['sanitize'] ? filter_xss($name) : $name;
+
+    case 'url':
+      return url("user/$account->uid", $options + array('absolute' => TRUE));
+
+    case 'edit-url':
+      return url("user/$account->uid/edit", $options + array('absolute' => TRUE));
+  }
 }
 
 /**

@@ -263,22 +263,6 @@ function system_rdf_namespaces() {
 }
 
 /**
- * Implement hook_entity_info().
- */
-function system_entity_info() {
-  return array(
-    'file' => array(
-      'label' => t('File'),
-      'base table' => 'file',
-      'object keys' => array(
-        'id' => 'fid',
-      ),
-      'static cache' => FALSE,
-    ),
-  );
-}
-
-/**
  * Implement hook_element_info().
  */
 function system_element_info() {
@@ -2745,6 +2729,145 @@ function system_image_toolkits() {
     ),
   );
 }
+
+/**
+ * Implement hook_datatype_info().
+ */
+function system_datatype_info() {
+  $types['text'] = array(
+    // By default don't apply any format to text values.
+    'default format' => NULL,
+  );
+  $types['list'] = array(
+    'default format' => 'concatenated',
+    'formats' => array(
+      'concatenated' => array(
+        'label' => t("Concatenated using commas"),
+        'description' => t("Concatenates the list items using commas as separator. (%list)", array('%list' => system_format_list(array('Item 1', 'Item 2')))),
+        'callback' => 'system_format_list',
+      ),
+    ),
+  );
+  $types['date'] = array(
+    'default format' => 'medium',
+    'formats' => array(),
+  );
+
+  // Specify date related formats.
+  $formats = &$types['date']['formats'];
+  
+  $formats['short'] = array(
+    'label' => t("Short format"),
+    'description' => t("A date in 'short' format. (%date)", array('%date' => format_date(REQUEST_TIME, 'short'))),
+    'callback' => 'system_format_date',
+  );
+  $formats['medium'] = array(
+    'label' => t("Medium format"),
+    'description' => t("A date in 'medium' format. (%date)", array('%date' => format_date(REQUEST_TIME, 'medium'))),
+    'callback' => 'system_format_date',
+  );
+  $formats['long'] = array(
+    'label' => t("Long format"),
+    'description' => t("A date in 'long' format. (%date)", array('%date' => format_date(REQUEST_TIME, 'long'))),
+    'callback' => 'system_format_date',
+  );
+  $formats['since'] = array(
+    'label' => t("Time-since"),
+    'description' => t("A data in 'time-since' format. (%date)", array('%date' => format_interval(REQUEST_TIME - 360, 2))),
+    'callback' => 'system_format_date',
+  );
+  $formats['raw'] = array(
+    'label' => t("Raw timestamp"),
+    'description' => t("A date in UNIX timestamp format (%date)", array('%date' => REQUEST_TIME)),
+    'callback' => 'system_format_date',
+  );
+  return $types;
+}
+
+/**
+ * Callback for formating date tokens.
+ * @see system_datatype_info()
+ */
+function system_format_date($date, $format, $options) {
+  $langcode = isset($options['language']) ? $options['language']->language : NULL;
+
+  switch ($format) {
+    case 'raw':
+      return filter_xss($date);
+
+    case 'short':
+    case 'medium':
+    case 'long':
+      return format_date($date, $format, '', NULL, $langcode);
+
+    case 'since':
+      return format_interval((REQUEST_TIME - $date), 2, $langcode);
+  }
+}
+
+/**
+ * Callback for formating a list.
+ * @see system_datatype_info()
+ */
+function system_format_list(array $list, $format = NULL, $options = array(), $context = array()) {
+  if (empty($context['wrapper'])) {
+    return implode(', ', $list);
+  }
+  // Use the wrapper instead of the values, so that a possible default format
+  // of the list items is applied.
+  $output = array();
+  foreach ($context['wrapper'] as $key) {
+    $output[] = (string)$context['wrapper'][$key];
+  }
+  return implode(', ', $output);
+}
+
+/**
+ * Callback for getting system properties.
+ * @see system_entity_info()
+ */
+function system_get_properties($data = FALSE, array $options, $name) {
+  switch ($name) {
+    case 'name':
+      return variable_get('site_name', 'Drupal');
+
+    default:
+      return variable_get('site_' . $name, '');
+
+    case 'url':
+      return url('<front>', $options);
+
+    case 'login-url':
+      return url('user', $options);
+  }
+}
+
+/**
+ * Callback for getting file properties.
+ * @see system_entity_info()
+ */
+function system_get_file_properties($data, array $options, $name) {
+  switch ($name) {
+    case 'name':
+      return $options['sanitize'] ? check_plain($file->filename) : $file->filename;
+
+    case 'path':
+      return $options['sanitize'] ? filter_xss($file->filepath) : $file->filepath;
+
+    case 'mime':
+      return $options['sanitize'] ? filter_xss($file->filemime) : $file->filemime;
+
+    case 'size':
+      return $file->filesize;
+
+    case 'url':
+      return url(file_create_url($file->filepath), $options);
+
+    case 'owner':
+      return user_load($file->uid);
+  }
+}
+
 
 /**
  * Attempts to get a file using drupal_http_request and to store it locally.
