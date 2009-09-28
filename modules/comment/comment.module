@@ -2428,6 +2428,9 @@ function comment_get_properties($comment, array $options, $name) {
     case 'url':
       return url('comment/' . $comment->cid, array('fragment' => 'comment-' . $comment->cid) + $options);
 
+    case 'rdf-uri':
+      return url('comment/' . $comment->cid, array('fragment' => 'comment-' . $comment->cid, 'absolute' => TRUE));
+
     case 'edit-url':
       return url('comment/edit/' . $comment->cid, $options);
     

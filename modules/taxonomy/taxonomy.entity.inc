@@ -20,6 +20,8 @@ function taxonomy_entity_info() {
         'id' => 'tid',
         'bundle' => 'vocabulary_machine_name',
       ),
+      'path' => 'taxonomy/term',
+      'rdf-type' => array('skos:concept'),
       'bundle keys' => array(
         'bundle' => 'machine_name',
       ),
@@ -55,12 +57,14 @@ function taxonomy_entity_info() {
     'label' => t("Name"),
     'description' => t("The name of the taxonomy term."),
     'setter callback' => 'drupal_property_verbatim_set',
+    'rdf-property' => array('skos:prefLabel'),
   );
   $properties['description'] = array(
     'label' => t("Description"),
     'description' => t("The optional description of the taxonomy term."),
     'sanitize' => 'filter_xss',
     'setter callback' => 'drupal_property_verbatim_set',
+    'rdf-property' => array('skos:note'),
   );
   $properties['node-count'] = array(
     'label' => t("Node count"),
@@ -83,6 +87,7 @@ function taxonomy_entity_info() {
     'description' => t("The parent term of the taxonomy term, if one exists."),
     'getter callback' => 'taxonomy_term_get_properties',
     'type' => 'taxonomy_term',
+    'rdf-property' => array('skos:broader'),
   );
 
   $return['taxonomy_vocabulary'] = array(
@@ -142,5 +147,9 @@ function taxonomy_entity_info_alter(&$entity_info) {
     'description' => t("The taxonomy terms associated with this node."),
     'getter callback' => 'drupal_property_get_list',
     'type' => 'list<taxonomy_term>',
+    'item' => array(
+      'rdf-property' => array('sioc:topic'),
+    ),
   );
 }
+

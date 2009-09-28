@@ -1,0 +1,299 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Add support for RDF.
+ */
+
+/**
+ * Implement hook_entity_info().
+ *
+ * Create a page entity for easy generation of page RDF properties. This is
+ * the default mapping which can be overridden with rdfa_alter_page_mapping().
+ */
+function rdfa_entity_info() {
+  $types['page'] = array(
+    'label' => t("Current page"),
+    'rdf-type' => array('foaf:Document'),
+  );
+  $properties = &$types['page']['properties'];
+  
+  $properties['title'] = array(
+    'rdf-property' => array('dc:title'),
+    'getter callback' => 'drupal_get_title',
+  );
+  $properties['rdf-uri'] = array(
+    'label' => t("RDF URI"),
+    'description' => t("The RDF URI of the current page."),
+    'getter callback' => 'rdfa_page_get_uri',
+  );
+  return $types;
+}
+
+/**
+ * Allows altering the RDF mapping of the currently served page.
+ *
+ * @param $properties
+ *   An array keyed by the property name and containing an array of RDF related
+ *   property info, which is to be used for the current page.
+ * @param $rdfa_type
+ *   (optional) If set, the rdf-type of the page is set to the given value.
+ */
+function rdfa_alter_page_mapping(array $properties = array(), $rdfa_type = NULL) {
+  // To alter the mapping we change the entity info from a page by altering the
+  // static entity info variable. We can savely do so, as there can't be
+  // multiple instances of a page at the same time.
+
+  // Make sure entity info is initialized and get a reference on it.
+  entity_get_info();
+  $entity_info = &drupal_static('entity_get_info', array());
+  $page = &$entity_info['page'];
+  
+  // Add in only rdf-specific info of the properties.
+  $rdfa_keys = array_fill_keys(array('rdf-property', 'rdf-value', 'rdf-datatype'), TRUE);
+
+  foreach ($properties as $name => $info) {
+    $rdfa_info = array_intersect_key($info, $rdfa_keys);
+    $page['properties'][$name] = $rdfa_info + $page['properties'][$name];
+  }
+  // Add in the rdf-type if given.
+  if (isset($rdfa_type)) {
+    $page['rdf-type'] = $rdfa_type;
+  }
+}
+
+/**
+ * Returns RDFa attributes to render.
+ *
+ * @param $wrapper
+ *   A DrupalEntityPropertyWrapper of the rendered entity.
+ * @param $property
+ *   The name of the property to get attributes for. If set to NULL, the 'about'
+ *   option defaults to TRUE, so RDFa about the entity is added in.
+ * @param $delta
+ *   If the property has multiple values, an optional delta to return attributes
+ *   for a single value with the given delta.
+ * @param $options
+ *   (optional) An array of options, supported are:
+ *   - 'about': If set to TRUE, add in RDFa about the entity.
+ *   - 'resource': When refering to another entity, the resource attribute is
+ *     added by default. To avoid that, set this to FALSE.
+ * @return array
+ *   An array containing RDFa attributes as needed by drupal_attributes().
+ */
+function rdfa_attributes(DrupalEntityPropertyWrapper $wrapper, $property = NULL, $delta = NULL, array $options = array()) {
+  $attributes = array();
+  $options += array('about' => !isset($property), 'resource' => TRUE);
+
+  if ($options['about'] && isset($wrapper->{'rdf-uri'})) {
+    // Generate attributes for the whole entity.
+    $attributes['about'] = (string)$wrapper->{'rdf-uri'};
+    $info = $wrapper->getInfo() + array('rdf-type' => array());
+    $attributes['typeof'] = (array)$info['rdf-type'];
+
+    // Add in mappings defined for associated entity tags.
+    foreach ($wrapper->getTags() as $tag) {
+      if (!empty($info['tags'][$tag]['rdf-type'])) {
+        $attributes['typeof'] = array_merge((array)$info['tags'][$tag]['rdf-type'], $attributes['typeof']);
+      }
+    }
+    $attributes = array_filter($attributes);
+  }
+
+  try {
+    // Add in property specific attributes.
+    if (isset($property) && isset($wrapper->$property) && ($info = $wrapper->getPropertyInfo($property))) {
+      // Handle the delta value, if it has been specified.
+      $wrapper->$property;
+      if (isset($delta)) {
+        $valueWrapper = isset($valueWrapper[$delta]) ? $wrapper->$property[$delta] : NULL;
+        $info = isset($info['item']) ? $info['item'] : array();
+      }
+  
+      if (isset($info['rdf-property']) && (!isset($delta) || isset($valueWrapper))) {
+        $entity_info = entity_get_info();
+        // When referring to an entity, we have to use the 'rel' attribute.
+        $name = isset($entity_info[$info['type']]) ? 'rel' : 'property';
+
+        if ($name == 'rel' && $options['resource']) {
+          $valueWrapper = isset($delta) ? $valueWrapper : $wrapper->$property;
+          $attributes['resource'] = (string)$valueWrapper->{'rdf-uri'};
+        }
+        if (!empty($info['rdf-value'])) {
+          $valueWrapper = isset($delta) ? $valueWrapper : $wrapper->$property;
+          $attributes['content'] = (string)$valueWrapper->{$info['rdf-value']};
+        }
+        if (isset($info['rdf-datatype'])) {
+          $attributes['datatype'] = $info['rdf-datatype'];
+        }
+        $attributes[$name] = $info['rdf-property'];
+      }
+    }
+  }
+  catch (DrupalPropertyWrapperException $e) {
+    // A needed value isn't available, so ignore it.
+  }
+  return $attributes;
+}
+
+/**
+ * Implement hook_datatype_info().
+ */
+function rdfa_datatype_info() {
+  // Add the iso8601 date format and use it for RDF.
+  $types['date'] = array();
+  $types['date']['rdf-value'] = 'iso8601';
+  $types['date']['rdf-datatype'] = 'xsd:dateTime';
+  $types['date']['formats']['iso8601'] = array(
+    'label' => t("ISO8601 formatted"),
+    'description' => t("A date in ISO8601 format. (%date)", array('%date' => rdfa_date_iso8601(REQUEST_TIME))),
+    'callback' => 'rdfa_date_iso8601',
+  );
+  return $types;
+}
+
+/**
+ * Returns an ISO8601 formatted date based on the given date.
+ *
+ * Can be used as a callback for mappings.
+ *
+ * @param $timestamp
+ *   A date formatted as timestamp.
+ * @return string
+ *   An ISO8601 formatted date.
+ */
+function rdfa_date_iso8601($timestamp) {
+  return date(DATE_ISO8601, $timestamp);
+}
+
+/**
+ * Implement hook_node_view().
+ */
+function rdfa_node_view($node, $build_mode) {
+  if ($build_mode == 'full' && menu_get_object() == $node && arg(0) == 'node') {
+    // Full page view, so use some node-properties for the page.
+    $node_info = entity_get_info('node');
+    rdfa_alter_page_mapping(array('title' => $node_info['properties']['title']), $node_info['rdf-type']);
+  }
+}
+
+/**
+ * Implement MODULE_preprocess_HOOK() for the node template.
+ */
+function rdfa_preprocess_node(&$variables) {
+  $node = $variables['node'];
+  $wrapper = drupal_get_property_wrapper('node', $node, array('sanitize' => TRUE));
+  $variables['node_uri'] = $wrapper->{'rdf-uri'};
+  
+  // Add about and typeof attributes.
+  $variables['attributes_array'] += rdfa_attributes($wrapper);
+
+  $variables['title_attributes_array'] += rdfa_attributes($wrapper, 'title');
+  $variables['date'] += array('#attributes' => array());
+  $variables['date']['#attributes'] += rdfa_attributes($wrapper, 'created');
+  $variables['name'] += array('#attributes' => array());
+  $variables['name']['#attributes'] += rdfa_attributes($wrapper, 'author', NULL, array('resource' => FALSE));
+  
+  // Support terms.
+  if (!empty($node->taxonomy)) {
+    $links = &$variables['content']['links']['terms']['#links'];
+    // Add the node -> term relation.
+    $variables['content']['links']['terms']['#attributes'] += rdfa_attributes($wrapper, 'taxonomy', 0, array('resource' => FALSE));
+    foreach (array_values($node->taxonomy) as $key => $term) {
+      if (is_object($term)) {
+        // Add RDFa for the term itself.
+        $links['taxonomy_term_' . $term->tid]['attributes'] += rdfa_attributes($wrapper->taxonomy[$key], 'name', NULL, array('about' => TRUE));
+      }
+    }
+  }
+}
+
+/**
+ * Implement MODULE_preprocess_HOOK() for the comment template.
+ */
+function rdfa_preprocess_comment(&$variables) {
+  $wrapper = drupal_get_property_wrapper('comment', $variables['comment'], array('sanitize' => TRUE));
+  $variables['attributes_array'] += rdfa_attributes($wrapper);
+  $variables['title_attributes_array'] += rdfa_attributes($wrapper, 'title');
+  $variables['content']['comment_body'] += array('#attributes' => array());
+  $variables['content']['comment_body']['#attributes'] += rdfa_attributes($wrapper, 'body');
+  // Add the relation to the node and the parent comment, if any.
+  $variables['content']['node'] = array('#markup' => rdfa_reference(rdfa_attributes($wrapper, 'node')));
+  $variables['content']['parent'] = array('#markup' => rdfa_reference(rdfa_attributes($wrapper, 'parent')));
+}
+
+/**
+ * Returns an empty link just serving as RDFa reference.
+ *
+ * @param $attributes
+ *   The RDFa attributes to add, as returned from rdfa_attributes().
+ */
+function rdfa_reference(array $attributes = array()) {
+  if (isset($attributes['resource'])) {
+    // Rename the resource attribute to 'href'.
+    $attributes['href'] = $attributes['resource'];
+    unset($attributes['resource']);
+  }
+  return '<a' . drupal_attributes($attributes) . ' ></a>';
+}
+
+/**
+ * Implement hook_page_build().
+ */
+function rdfa_page_build(&$page) {
+  // Set the default rdf-uri for the current page.
+  $page['#uri'] = '#this';
+}
+
+/**
+ * Callback to get the RDF URI of a page.
+ * @see rdfa_entity_info().
+ */
+function rdfa_page_get_uri(array $page) {
+  return $page['#uri'];
+}
+
+/**
+ * Implement MODULE_preprocess_HOOK().
+ */
+function rdfa_preprocess_page(&$variables) {
+  $wrapper = drupal_get_property_wrapper('page', $variables['page'], array('sanitize' => TRUE));
+
+  // HTML attributes which define what resource a page is about and optionally
+  // its RDF type.
+  $variables['attributes_array'] += rdfa_attributes($wrapper);
+  // Set the property for the title of the page.
+  $variables['title_attributes_array'] += rdfa_attributes($wrapper, 'title');
+}
+
+/**
+ * Adds RDFa attributes to the template variables.
+ */
+function rdfa_preprocess_field(&$variables) {
+  $wrapper = drupal_get_property_wrapper($variables['object_type'], $variables['object'], array('sanitize' => TRUE));
+  $variables['attributes_array'] += rdfa_attributes($wrapper, $variables['field_name']);
+
+  foreach ($variables['items'] as $delta => $item) {
+    $variables['item_attributes_array'][$delta] = rdfa_attributes($wrapper, $variables['field_name'], $delta);
+  }
+}
+
+/**
+ * Implement hook_user_view().
+ */
+function rdfa_user_view($account) {
+  if (menu_get_object('user_uid_optional') == $account && arg(0) == 'user') {
+    // We are viewing the account, so use the account-properties for the page.
+    $user_info = entity_get_info('user');
+    rdfa_alter_page_mapping(array('title' => $user_info['properties']['name']), $user_info['rdf-type']);
+  }
+}
+
+/**
+ * Implements MODULE_preprocess_HOOK().
+ */
+function rdfa_preprocess_username(&$variables) {
+  $wrapper = drupal_get_property_wrapper('user', $variables['object']->account, array('sanitize' => TRUE));
+  $variables['object']->attributes += rdfa_attributes($wrapper, 'name', NULL, array('about' => TRUE));
+}

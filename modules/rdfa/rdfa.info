@@ -1,0 +1,7 @@
+; $Id$
+name = RDFa
+description = Enables RDFa output on your site.
+package = Core
+core = 7.x
+files[] = rdfa.module
+files[] = rdfa.test

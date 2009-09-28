@@ -21,6 +21,8 @@ function comment_entity_info() {
         'id' => 'cid',
         'bundle' => 'node_type',
       ),
+      'path' => 'comment',
+      'rdf-type' => array('sioc:Post'),
       'bundle keys' => array(
         'bundle' => 'type',
       ),
@@ -85,12 +87,14 @@ function comment_entity_info() {
     'label' => t("Title"),
     'description' => t("The title of the comment."),
     'getter callback' => 'comment_get_properties',
+    'rdf-property' => array('dc:title'),
   );
   $properties['body'] = array(
     'label' => t("Content"),
     'description' => t("The formatted content of the comment itself."),
     'getter callback' => 'comment_get_properties',
     'setter callback' => 'drupal_property_verbatim_set',
+    'rdf-property' => array('content:encoded'),
   );
   $properties['url'] = array(
     'label' => t("URL"),
@@ -107,23 +111,32 @@ function comment_entity_info() {
     'description' => t("The date the comment was posted."),
     'type' => 'date',
     'setter callback' => 'drupal_property_verbatim_set',
+    'rdf-property' => array('dc:created'),
   );
   $properties['parent'] = array(
     'label' => t("Parent"),
     'description' => t("The comment's parent, if comment threading is active."),
     'type' => 'comment',
     'getter callback' => 'comment_get_properties',
+    'rdf-property' => array('sioc:reply_of'),
   );
   $properties['node'] = array(
     'label' => t("Node"),
     'description' => t("The node the comment was posted to."),
     'type' => 'node',
     'getter callback' => 'comment_get_properties',
+    'rdf-property' => array('sioc:reply_of'),
   );
   $properties['author'] = array(
     'label' => t("Author"),
     'description' => t("The author of the comment, if they were logged in."),
     'type' => 'user',
+    'getter callback' => 'comment_get_properties',
+    'rdf-property' => array('sioc:has_creator'),
+  );
+  $properties['rdf-uri'] = array(
+    'label' => t("RDF URI"),
+    'description' => t("The RDF URI of this entity."),
     'getter callback' => 'comment_get_properties',
   );
   return $return;

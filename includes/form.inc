@@ -2545,7 +2545,7 @@ function theme_textarea($element) {
  *
  * @param $element
  *   An associative array containing the properties of the element.
- *   Properties used: #markup, #children.
+ *   Properties used: #markup, #attributes, #children.
  * @return
  *   A themed HTML string representing the HTML markup.
  *
@@ -2553,7 +2553,14 @@ function theme_textarea($element) {
  */
 
 function theme_markup($element) {
-  return (!empty($element['#markup']) ? $element['#markup'] : '') . drupal_render_children($element);
+  $output = (!empty($element['#markup']) ? $element['#markup'] : '') . drupal_render_children($element);
+  if (!empty($element['#attributes'])) {
+    // We cannot use a span as we might wrap block level elements.
+    $element['#attributes'] += array('style' => '');
+    $element['#attributes']['style'] .= 'display: inline;';
+    $output = '<div' . drupal_attributes($element['#attributes']) . '>' . $output . '</div>';
+  }
+  return $output;
 }
 
 /**

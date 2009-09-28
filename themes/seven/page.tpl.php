@@ -3,14 +3,14 @@
 ?>
   <div id="branding" class="clearfix">
     <?php print $breadcrumb; ?>
-    <?php if ($title): ?><h1 class="page-title"><?php print $title; ?></h1><?php endif; ?>
+    <?php if ($title): ?><h1 class="page-title"<?php print $title_attributes; ?>><?php print $title; ?></h1><?php endif; ?>
     <?php if ($primary_local_tasks): ?><ul class="tabs primary"><?php print $primary_local_tasks; ?></ul><?php endif; ?>
   </div>
 
   <div id="page">
     <?php if ($secondary_local_tasks): ?><ul class="tabs secondary"><?php print $secondary_local_tasks; ?></ul><?php endif; ?>
 
-    <div id="content" class="clearfix">
+    <div id="content" class="clearfix"<?php print $attributes; ?>>
       <?php if ($show_messages && $messages): ?>
         <div id="console" class="clearfix"><?php print $messages; ?></div>
       <?php endif; ?>

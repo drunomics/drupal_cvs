@@ -19,6 +19,8 @@ function user_entity_info() {
       'object keys' => array(
         'id' => 'uid',
       ),
+      'path' => 'user',
+      'rdf-type' => array('sioc:User'),
       'bundles' => array(
         'user' => array(
           'label' => t('User'),
@@ -43,6 +45,7 @@ function user_entity_info() {
     'description' => t("The login name of the user account."),
     'getter callback' => 'user_get_properties',
     'setter callback' => 'drupal_property_verbatim_set',
+    'rdf-property' => array('foaf:name'),
   );
   $properties['mail'] = array(
     'label' => t("Email"),

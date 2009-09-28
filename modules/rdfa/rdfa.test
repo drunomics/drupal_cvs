@@ -1,0 +1,153 @@
+<?php
+// $Id$
+
+/**
+ * RDFa markup generation tests.
+ */
+class RdfaMarkupTestCase extends DrupalWebTestCase {
+  public static function getInfo() {
+    return array(
+      'name' => t('RDFa markup'),
+      'description' => t('Test RDF markup generation.'),
+      'group' => t('RDF'),
+    );
+  }
+
+  function setUp() {
+    // Enable RDF in the test environment.
+    parent::setUp('rdfa');
+  }
+
+  /**
+   * Test rdfa_attributes().
+   */
+  function testDrupalRdfaAtributes() {
+    
+    $node = $this->drupalCreateNode();
+    $wrapper = drupal_get_property_wrapper('node', $node);
+    $attributes = rdfa_attributes($wrapper, 'created');
+
+    // Test getting attributes for the node created date.
+    $this->assertEqual('xsd:dateTime', $attributes['datatype'], 'Datatype returned.');
+    $this->assertTrue(in_array('dc:created', $attributes['property']), 'Property returned.');
+    $this->assertEqual(rdfa_date_iso8601($node->created), $attributes['content'], 'Content returned.');
+
+    // Test getting attributes for the node title.
+    $attributes = rdfa_attributes($wrapper, 'title');
+    $this->assertEqual(array('property' => array('dc:title')), $attributes, 'Property returned.');
+  }
+}
+
+class RDFaTestCase extends DrupalWebTestCase {
+  
+  public static function getInfo() {
+    return array(
+      'name' => t('Test RDFa output'),
+      'description' => t('Ensure that RDFa is output on pages.'),
+      'group' => t('RDF'),
+    );
+  }
+
+  function setUp() {
+    parent::setUp('rdfa');
+  }
+
+  function testUserRdfa() {
+    // Create a user with access to view user profiles.
+    $user = $this->drupalCreateUser(array('access user profiles'));
+    // Create a user profile to view.
+    $account = $this->drupalCreateUser();
+    
+    $this->drupalLogin($user);
+    $this->drupalGet('user/' . $account->uid);
+
+    $result = $this->xpath('//*[contains(@about, "#this") and contains(@typeof, "sioc:User")]');
+    $this->assertFalse(empty($result), t('Found a typeof attribute including sioc:User'));
+
+    $result = $this->xpath('//h2[contains(@property, "foaf:name")]');
+    $this->assertFalse(empty($result), t('Found a h2 tag with property foaf:name'));
+  }
+
+  function testNodeRdfa() {
+    $user = $this->drupalCreateUser(array('access content'));
+    // Create a node to view.
+    $node = $this->drupalCreateNode();
+    
+    $this->drupalLogin($user);
+    $this->drupalGet('node/' . $node->nid);
+
+    $result = $this->xpath('//*[contains(@about, "#this") and contains(@typeof, "foaf:Document")]');
+    $this->assertFalse(empty($result), t('Found a typeof attribute including foaf:Document'));
+
+    $result = $this->xpath('//h2[contains(@property, "dc:title")]');
+    $this->assertFalse(empty($result), t('Found a h2 tag with property dc:title'));
+  }
+  
+  
+}
+
+
+
+class RdfaFieldTestCase extends DrupalWebTestCase {
+
+  public static function getInfo() {
+    return array(
+      'name' => t('RDFa field markup'),
+      'description' => t('Test RDFa markup in fields.'),
+      'group' => t('RDF'),
+    );
+  }
+
+  function setUp() {
+    parent::setUp('field_test', 'rdfa');
+
+    $this->field_name = drupal_strtolower($this->randomName() . '_field_name');
+    $this->field = array('field_name' => $this->field_name, 'type' => 'test_field', 'cardinality' => 4);
+    $this->field = field_create_field($this->field);
+    $this->field_id = $this->field['id'];
+    $this->instance = array(
+      'field_name' => $this->field_name,
+      'bundle' => 'test_bundle',
+      'label' => $this->randomName() . '_label',
+      'description' => $this->randomName() . '_description',
+      'weight' => mt_rand(0, 127),
+      'settings' => array(
+        'test_instance_setting' => $this->randomName(),
+      ),
+      'widget' => array(
+        'type' => 'test_field_widget',
+        'label' => 'Test Field',
+        'settings' => array(
+          'test_widget_setting' => $this->randomName(),
+        )
+      ),
+     'property info' => array(
+        'item' => array(
+          'rdf-property' => array('dc:created'),
+        ),
+      ),
+    );
+    field_create_instance($this->instance);
+  }
+
+  function testAttributesInMarkup() {
+    $entity_type = 'test_entity';
+    $entity = field_test_create_stub_entity(0, 0, $this->instance['bundle']);
+    $langcode = FIELD_LANGUAGE_NONE;
+
+    // Populate values to be displayed.
+    $date = '2009-09-05';
+    $values = array(0 => array('value' => strtotime($date)));
+    $entity->{$this->field_name}[$langcode] = $values;
+    
+    $wrapper = drupal_get_property_wrapper($entity_type, $entity);
+
+    $this->content = drupal_render(field_attach_view($entity_type, $entity));
+
+    $this->assertPattern('/property="dc:created"/');
+    $this->assertPattern('/datatype="xsd:dateTime"/');
+    $date_iso8601 = preg_quote(rdfa_date_iso8601(strtotime($date)));
+    $this->assertPattern("/content=\"$date_iso8601\"/");
+  }
+
+}

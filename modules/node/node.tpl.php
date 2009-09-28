@@ -12,9 +12,10 @@
  *   hide($content['field_example']) to temporarily suppress the printing of a
  *   given element.
  * - $user_picture: The node author's picture from user-picture.tpl.php.
- * - $date: Formatted creation date (use $created to reformat with
- *   format_date()).
- * - $name: Themed username of node author output from theme_username().
+ * - $date: An array containing the formatted creation date (use $created to
+ *   reformat with format_date()). Use render($date) to print it.
+ * - $name: An array containing themed username of node author output from
+ *   theme_username(). Use render($name) to print it.
  * - $node_url: Direct url of the current node.
  * - $terms: the themed list of taxonomy term links output from theme_links().
  * - $display_submitted: whether submission information should be displayed.
@@ -84,7 +85,7 @@
         <span class="submitted">
           <?php
             print t('Submitted by !username on @datetime',
-              array('!username' => $name, '@datetime' => $date));
+              array('!username' => render($name), '@datetime' => render($date)));
           ?>
         </span>
       <?php endif; ?>

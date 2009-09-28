@@ -23,6 +23,8 @@ function node_entity_info() {
         'revision' => 'vid',
         'bundle' => 'type',
       ),
+      'path' => 'node',
+      'rdf-type' => array('sioc:Item', 'foaf:Document'),
       // Node.module handles its own caching.
       // 'cacheable' => FALSE,
       'bundles' => array(),
@@ -77,6 +79,7 @@ function node_entity_info() {
     'label' => t("Title"),
     'description' => t("The title of the node."),
     'setter callback' => 'drupal_property_verbatim_set',
+    'rdf-property' => array('dc:title'),
   );
   $properties['language'] = array(
     'label' => t("Language"),
@@ -98,11 +101,13 @@ function node_entity_info() {
     'type' => 'date',
     'description' => t("The date the node was posted."),
     'setter callback' => 'drupal_property_verbatim_set',
+    'rdf-property' => array('dc:created'),
   );
   $properties['changed'] = array(
     'label' => t("Date changed"),
     'type' => 'date',
     'description' => t("The date the node was most recently updated."),
+    'rdf-property' => array('dc:modified'),
   );
   $properties['author-name'] = array(
     'label' => t("Author name"),
@@ -114,6 +119,7 @@ function node_entity_info() {
     'type' => 'user',
     'description' => t("The author of the node."),
     'getter callback' => 'node_get_properties',
+    'rdf-property' => array('sioc:has_creator'),
   );
 
   return $return;

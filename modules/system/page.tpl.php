@@ -35,7 +35,9 @@
  *   administration interface.
  *
  * Page content (in order of occurrence in the default page.tpl.php):
+ * - $attributes: String of attributes referring to the whole page.
  * - $title: The page title, for use in the actual HTML content.
+ * - $title_attributes: String of attributes referring to the page title.
  * - $messages: HTML for status and error messages. Should be displayed prominently.
  * - $tabs: Tabs linking to any sub-pages beneath the current page (e.g., the view
  *   and edit tabs when displaying a node).
@@ -108,9 +110,9 @@
 
     <div id="main-wrapper"><div id="main" class="clearfix">
 
-      <div id="content" class="column"><div class="section">
+      <div id="content" class="column"<?php print $attributes; ?>><div class="section">
         <?php if ($page['highlight']): ?><div id="highlight"><?php print render($page['highlight']); ?></div><?php endif; ?>
-        <?php if ($title): ?><h1 class="title" id="page-title"><?php print $title; ?></h1><?php endif; ?>
+        <?php if ($title): ?><h1 class="title" id="page-title"<?php print $title_attributes; ?>><?php print $title; ?></h1><?php endif; ?>
         <?php if ($tabs): ?><div class="tabs"><?php print $tabs; ?></div><?php endif; ?>
         <?php print render($page['help']); ?>
         <?php if ($action_links): ?><ul class="action-links"><?php print $action_links; ?></ul><?php endif; ?>

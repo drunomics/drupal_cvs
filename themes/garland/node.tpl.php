@@ -10,7 +10,7 @@
   <?php endif; ?>
 
   <?php if ($display_submitted): ?>
-    <span class="submitted"><?php print $date; ?> — <?php print $name; ?></span>
+    <span class="submitted"><?php print render($date); ?> — <?php print render($name); ?></span>
   <?php endif; ?>
 
   <div class="content clearfix">

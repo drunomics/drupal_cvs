@@ -524,6 +524,9 @@ function node_configure_fields($type) {
             'type' => 'text_summary_or_trimmed',
           ),
         ),
+       'property info' => array(
+          'rdf-property' => array('content:encoded'),
+        ),
       );
       field_create_instance($instance);
     }
@@ -1134,8 +1137,8 @@ function template_preprocess_node(&$variables) {
   $variables['node'] = $variables['elements']['#node'];
   $node = $variables['node'];
 
-  $variables['date']      = format_date($node->created);
-  $variables['name']      = theme('username', $node);
+  $variables['date']      = array('#markup' => format_date($node->created));
+  $variables['name']      = array('#markup' => theme('username', $node));
   $variables['node_url']  = url('node/' . $node->nid);
   $variables['title']     = check_plain($node->title);
   $variables['page']      = (bool)menu_get_object();

@@ -28,6 +28,12 @@
  * modules are supposed to build upon this hook to add further entity or entity
  * property related information.
  *
+ * To define the RDF mappings of an entity specify the attribute 'rdf-type'
+ * accordingly for an entity, bundle or entity tag. Furthermore each entity with
+ * ab RDF mapping needs a property 'rdf-uri', which is used to get its URI.
+ * However this property and the URI are automatically generated for entities
+ * with 'object keys' and 'path' specified.
+ *
  * @see entity_load()
  * @see hook_entity_info_alter()
  * @see drupal_get_property_wrapper()
@@ -63,6 +69,9 @@
  *       the object (e.g. what nodes call "content type").
  *       This element can be omitted if this type has no bundles (all objects
  *       have the same fields).
+ *   - path: Optionally, the path that is used to view a object without the
+ *     trailing id. The id of the viewed object is automatically appended.
+ *   - rdf-type: An optional array describing a mapping to RDF classes.
  *   - bundle keys: An array describing how the Field API can extract the
  *     information it needs from the bundle objects for this type (e.g
  *     $vocabulary objects for terms; not applicable for nodes).
@@ -93,6 +102,7 @@
  *       - access arguments: As in hook_menu().
  *     - 'default tags': (optional) An array of entity tags that are usually
  *       attached to that bundle.
+ *     - rdf-type: An optional array describing a mapping to RDF classes.
  *     - properties: An array describing the properties specific to this bundle
  *       supporting the same keys as usual entity properties below.
  *   - properties: An array describing the properties of an entity keyed by
@@ -119,12 +129,19 @@
  *       to specify the bundle of the referenced entity beforehand.
  *     - tags: If this property references another entity, this can be used to
  *       specify an array of tags of the referenced entity beforehand.
+ *     - rdf-property: The RDF properties to be used for generating RDF. May be
+ *        a single string value or an array of values.
+ *     - rdf-datatype: (optional) If given, the RDF datatype of the RDF value.
+ *     - rdf-value: (optional) If given, the name of a format used to format the
+ *        RDF value of the property. If not set, the default format (or display
+ *        in case of RDFa) of the property determines the value.
  *   - 'default tags': (optional) An array of entity tags that are usually
  *     attached to this entity.
  *   - tags: An array describing all entity tags for this entity type. Keys are
  *     the actual tag names.
  *     - label: The human-readable name of the entity tag.
  *     - description: A human-readable description of the entity tag.
+ *     - rdf-type: An optional array describing a mapping to RDF classes.
  *   - 'name property': Specifies the property used to get the name of an
  *     entity. If there is a property 'name', it's used by default.
  */

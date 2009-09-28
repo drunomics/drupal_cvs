@@ -663,7 +663,7 @@ function field_info_storage_settings($type) {
 /**
  * Implement hook_entity_info_alter().
  *
- * Add metadata about all properties provided by fields.
+ * Add metadata about all properties provided by fields and generate RDF URIs.
  */
 function field_entity_info_alter(&$entity_info) {
   // Loop over all field instance and add them as property.
@@ -682,6 +682,26 @@ function field_entity_info_alter(&$entity_info) {
       }
     }
   }
+  // Auto-generate RDF URIs for fieldable entities with a specified path.
+  foreach ($entity_info as $type => &$info) {
+    if (!empty($info['object keys']) && !empty($info['path']) && empty($info['properties']['rdf-uri'])) {
+      $info['properties']['rdf-uri'] = array(
+        'label' => t("RDF URI"),
+        'description' => t("The RDF URI of this entity."),
+        'getter callback' => 'field_object_get_rdf_uri',
+      );
+    }
+  }
+}
+
+/**
+ * Callback to get the RDF URI of fieldable objects.
+ * @see field_entity_info_alter().
+ */
+function field_object_get_rdf_uri($object, array $options = array(), $name = 'rdf-uri', $object_type) {
+  $info = entity_get_info($object_type);
+  list($id, $vid, $bundle) = field_extract_ids($object_type, $object);
+  return url($info['path'] . '/' . $id , array('absolute' => TRUE, 'fragment' => 'this'));
 }
 
 /**

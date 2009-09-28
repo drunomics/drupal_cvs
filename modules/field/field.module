@@ -756,6 +756,8 @@ function template_preprocess_field(&$variables) {
 
   $additions = array(
     'object' => $element['#object'],
+    'object_type' => $element['#object_type'],
+    'bundle' => $bundle,
     'field' => $field,
     'instance' => $instance,
     'build_mode' => $element['#build_mode'],
