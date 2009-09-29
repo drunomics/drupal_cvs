@@ -685,7 +685,7 @@ function field_entity_info_alter(&$entity_info) {
 }
 
 /**
- * Callback to add in property info per field instance.
+ * Callback to add in property info defaults per field instance.
  * @see field_entity_info_alter().
  */
 function field_default_property_callback(&$entity_info, $entity_type, $field, $instance, $field_type) {

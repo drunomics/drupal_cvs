@@ -132,6 +132,11 @@ function hook_field_extra_fields($bundle) {
  *     instance definition. This formatter must be available whenever the field
  *     type is available (i.e. provided by the field type module, or by a module
  *     the field type module depends on).
+ *   - property_type: The type of a field item. Used to generate property info
+ *     defauls for any instance of this field, see hook_entity_info().
+ *   - property_callbacks: An array of callbacks generating property info for
+ *     instances of this field. For an example see
+ *     field_default_property_callback(), which is always invoked first.
  */
 function hook_field_info() {
   return array(
