@@ -105,23 +105,21 @@ function rdfa_attributes(DrupalEntityPropertyWrapper $wrapper, $property = NULL,
     // Add in property specific attributes.
     if (isset($property) && isset($wrapper->$property) && ($info = $wrapper->getPropertyInfo($property))) {
       // Handle the delta value, if it has been specified.
-      $wrapper->$property;
       if (isset($delta)) {
-        $valueWrapper = isset($valueWrapper[$delta]) ? $wrapper->$property[$delta] : NULL;
         $info = isset($info['item']) ? $info['item'] : array();
       }
-  
-      if (isset($info['rdf-property']) && (!isset($delta) || isset($valueWrapper))) {
+
+      if (isset($info['rdf-property'])) {
         $entity_info = entity_get_info();
         // When referring to an entity, we have to use the 'rel' attribute.
         $name = isset($entity_info[$info['type']]) ? 'rel' : 'property';
 
         if ($name == 'rel' && $options['resource']) {
-          $valueWrapper = isset($delta) ? $valueWrapper : $wrapper->$property;
+          $valueWrapper = isset($delta) ? $wrapper->{$property}[$delta] : $wrapper->$property;
           $attributes['resource'] = (string)$valueWrapper->{'rdf-uri'};
         }
         if (!empty($info['rdf-value'])) {
-          $valueWrapper = isset($delta) ? $valueWrapper : $wrapper->$property;
+          $valueWrapper = isset($delta) ? $wrapper->{$property}[$delta] : $wrapper->$property;
           $attributes['content'] = (string)$valueWrapper->{$info['rdf-value']};
         }
         if (isset($info['rdf-datatype'])) {
@@ -131,40 +129,10 @@ function rdfa_attributes(DrupalEntityPropertyWrapper $wrapper, $property = NULL,
       }
     }
   }
-  catch (DrupalPropertyWrapperException $e) {
+  catch (DrupalPropertyWrapperException2 $e) {
     // A needed value isn't available, so ignore it.
   }
   return $attributes;
-}
-
-/**
- * Implement hook_datatype_info().
- */
-function rdfa_datatype_info() {
-  // Add the iso8601 date format and use it for RDF.
-  $types['date'] = array();
-  $types['date']['rdf-value'] = 'iso8601';
-  $types['date']['rdf-datatype'] = 'xsd:dateTime';
-  $types['date']['formats']['iso8601'] = array(
-    'label' => t("ISO8601 formatted"),
-    'description' => t("A date in ISO8601 format. (%date)", array('%date' => rdfa_date_iso8601(REQUEST_TIME))),
-    'callback' => 'rdfa_date_iso8601',
-  );
-  return $types;
-}
-
-/**
- * Returns an ISO8601 formatted date based on the given date.
- *
- * Can be used as a callback for mappings.
- *
- * @param $timestamp
- *   A date formatted as timestamp.
- * @return string
- *   An ISO8601 formatted date.
- */
-function rdfa_date_iso8601($timestamp) {
-  return date(DATE_ISO8601, $timestamp);
 }
 
 /**

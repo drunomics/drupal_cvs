@@ -30,7 +30,7 @@ class RdfaMarkupTestCase extends DrupalWebTestCase {
     // Test getting attributes for the node created date.
     $this->assertEqual('xsd:dateTime', $attributes['datatype'], 'Datatype returned.');
     $this->assertTrue(in_array('dc:created', $attributes['property']), 'Property returned.');
-    $this->assertEqual(rdfa_date_iso8601($node->created), $attributes['content'], 'Content returned.');
+    $this->assertEqual(date(DATE_ISO8601, $node->created), $attributes['content'], 'Content returned.');
 
     // Test getting attributes for the node title.
     $attributes = rdfa_attributes($wrapper, 'title');
@@ -143,10 +143,9 @@ class RdfaFieldTestCase extends DrupalWebTestCase {
     $wrapper = drupal_get_property_wrapper($entity_type, $entity);
 
     $this->content = drupal_render(field_attach_view($entity_type, $entity));
-
     $this->assertPattern('/property="dc:created"/');
     $this->assertPattern('/datatype="xsd:dateTime"/');
-    $date_iso8601 = preg_quote(rdfa_date_iso8601(strtotime($date)));
+    $date_iso8601 = preg_quote(date(DATE_ISO8601, strtotime($date)));
     $this->assertPattern("/content=\"$date_iso8601\"/");
   }
 

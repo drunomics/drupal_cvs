@@ -1684,7 +1684,7 @@ function system_admin_menu_block($item) {
     }
   }
   if ($has_subitems) {
-    // If we've had at least one non-tab subitem, remove the link for the 
+    // If we've had at least one non-tab subitem, remove the link for the
     // default task, since that is already broken down to subitems.
     unset($content[$default_task]);
   }
@@ -2753,6 +2753,8 @@ function system_datatype_info() {
   $types['date'] = array(
     'default format' => 'medium',
     'formats' => array(),
+    'rdf-datatype' => 'xsd:dateTime',
+    'rdf-value' => 'iso8601',
   );
 
   // Specify date related formats.
@@ -2783,6 +2785,11 @@ function system_datatype_info() {
     'description' => t("A date in UNIX timestamp format (%date)", array('%date' => REQUEST_TIME)),
     'callback' => 'system_format_date',
   );
+  $formats['iso8601'] = array(
+    'label' => t("ISO8601 formatted"),
+    'description' => t("A date in ISO8601 format. (%date)", array('%date' => date(DATE_ISO8601, REQUEST_TIME))),
+    'callback' => 'system_format_date',
+  );
   return $types;
 }
 
@@ -2804,6 +2811,9 @@ function system_format_date($date, $format, $options) {
 
     case 'since':
       return format_interval((REQUEST_TIME - $date), 2, $langcode);
+
+    case 'iso8601':
+      return date(DATE_ISO8601, $date);
   }
 }
 
