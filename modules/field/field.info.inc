@@ -749,10 +749,8 @@ function field_format_property($value, $formatter_type, array $options, array $c
  */
 function field_property_get($object, array $options, $name, $obj_type) {
   $langcode = _field_property_get_langcode($object, $options, $name);
-  if ($options['sanitize'] && !isset($object->{$name}[$langcode][0]['safe'])) {
-    _field_refresh_sanitized_values($object, $obj_type, $name, $langcode);
-  }
-  return $options['sanitize'] ? $object->{$name}[$langcode][0]['safe'] : $object->{$name}[$langcode][0]['value'];
+  $key = $options['sanitize'] ? _field_get_sanitized_key($object, $obj_type, $name, $langcode) : 'value';
+  return $object->{$name}[$langcode][0][$key];
 }
 
 /**
@@ -762,16 +760,13 @@ function field_property_get_multiple($object, array $options, $name, $obj_type) 
   $langcode = _field_property_get_langcode($object, $options, $name);
   $values = array();
   if (isset($object->{$name}[$langcode])) {
-    if ($options['sanitize'] && !isset($object->{$name}[$langcode][0]['safe'])) {
-      _field_refresh_sanitized_values($object, $obj_type, $name, $langcode);
-    }
-    foreach ($object->{$name}[$langcode] as $key => $data) {
-      $values[$key] = $options['sanitize'] ? $data['safe'] : $data['value'];
+    $key = $options['sanitize'] ? _field_get_sanitized_key($object, $obj_type, $name, $langcode) : 'value';
+    foreach ($object->{$name}[$langcode] as $delta => $data) {
+      $values[$delta] = $data[$key];
     }
   }
   return $values;
 }
-
 
 function _field_property_get_langcode($object, $options, $name) {
   $langcode = FIELD_LANGUAGE_NONE;
@@ -781,15 +776,24 @@ function _field_property_get_langcode($object, $options, $name) {
   return $langcode;
 }
 
-function _field_refresh_sanitized_values($object, $obj_type, $field_name, $langcode) {
+/**
+ * Returns the key used to get a sanitized value. If the field implements
+ * hook_field_sanitize() the key 'safe' is returned, else it's assumed that
+ * the key 'value' is safe.
+ */
+function _field_get_sanitized_key($object, $obj_type, $field_name, $langcode) {
+  if (isset($object->{$field_name}[$langcode][0]['safe'])) {
+    return 'safe';
+  }
   $field = field_info_field($field_name);
   list($id, $vid, $bundle) = field_extract_ids($obj_type, $object);
   $instance = field_info_instance($field_name, $bundle);
 
-  $function = $field['module'] . '_field_sanitize';
-  if (function_exists($function)) {
+  if (function_exists($function = $field['module'] . '_field_sanitize')) {
     $function($obj_type, $object, $field, $instance, $langcode, $object->{$field_name}[$langcode]);
+    return 'safe';
   }
+  return 'value';
 }
 
 /**

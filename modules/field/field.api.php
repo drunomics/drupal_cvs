@@ -136,7 +136,10 @@ function hook_field_extra_fields($bundle) {
  *     defauls for any instance of this field, see hook_entity_info().
  *   - property_callbacks: An array of callbacks generating property info for
  *     instances of this field. For an example see
- *     field_default_property_callback(), which is always invoked first.
+ *     field_default_property_callback(), which is always invoked first. This
+ *     callback adds in some defaults which work fine for fields using the
+ *     'value' key and the 'safe' key for sanitized data. If it's not like that,
+ *     another callback should be added to override the defaults.
  */
 function hook_field_info() {
   return array(
