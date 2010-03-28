@@ -110,12 +110,12 @@ Drupal.ajax = function (base, element, element_settings) {
   this.url = element_settings.url.replace(/\/nojs(\/|$)/g, '/ajax$1');
   this.wrapper = '#' + element_settings.wrapper;
 
-  // If there isn't a form, jQuery.ajax() will be used instead, allowing us to
-  // bind AJAX to links as well. But if the element is inside a form, the form
-  // will be submitted.
+  // If there isn't a form, jQuery.ajax() will be used instead.
   if (this.element.form) {
     this.form = $(this.element.form);
   }
+  // Set the form for non-input elements like links. This allows triggering form
+  // submissions by those elements too.
   else if ($(this.element).closest('form').length) {
     this.form = $(this.element).closest('form');
   }
