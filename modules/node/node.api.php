@@ -681,7 +681,7 @@ function hook_node_validate($node, $form) {
 }
 
 /**
- * This hook is called whenever a node form is submitted and an updated node object is needed based on the submission.
+ * Update the node object based on submitted form values.
  *
  * This hook is called when the "Save" or "Preview" buttons of a node editing
  * form is clicked. It may also be called during other button-clicks if the
@@ -697,7 +697,7 @@ function hook_node_validate($node, $form) {
  * @param $form
  *   The form being used to edit the node.
  * @param $form_state
- *   The form state array.  
+ *   The form state array.
  *
  * @see node_form_submit_build_node()
  *

@@ -423,7 +423,7 @@ function node_form_submit($form, &$form_state) {
 }
 
 /**
- * Build a node from what was submitted on the add/edit form by processing the submitted form values.
+ * Build a node by processing the submitted form values.
  *
  * This function invokes submit handlers that assume a fully validated form, so
  * do not call this function from button-level submit handlers of buttons that
@@ -440,7 +440,7 @@ function node_form_submit_build_node($form, &$form_state) {
   form_execute_handlers('submit', $form, $form_state);
 
   // Execute all entity-level and field-level submit hooks.
-  $node = (object)($form_state['values'] + (array)$form_state['node']);
+  $node = (object) ($form_state['values'] + (array) $form_state['node']);
   $node = node_submit($node);
   field_attach_submit('node', $node, $form, $form_state);
   foreach (module_implements('node_submit') as $module) {
