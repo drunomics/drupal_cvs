@@ -681,6 +681,37 @@ function hook_node_validate($node, $form) {
 }
 
 /**
+ * This hook is called whenever a node form is submitted and an updated node object is needed based on the submission.
+ *
+ * This hook is called when the "Save" or "Preview" buttons of a node editing
+ * form is clicked. It may also be called during other button-clicks if the
+ * submit handler for that button requires an updated node object.
+ *
+ * Modules may use this hook to extract their data from $form_state and set it
+ * on the $node object. Note that every key/value pair in $form_state['values']
+ * is automatically added as a corresponding property/value pair in $node, so
+ * modules only need to implement this hook to do something different than that.
+ *
+ * @param $node
+ *   The node being built from data in $form_state.
+ * @param $form
+ *   The form being used to edit the node.
+ * @param $form_state
+ *   The form state array.  
+ *
+ * @see node_form_submit_build_node()
+ *
+ * @ingroup node_api_hooks
+ */
+function hook_node_submit($node, $form, $form_state) {
+  // Decompose the selected menu parent option into 'menu_name' and 'plid', if
+  // the form used the default parent selection widget.
+  if (!empty($form_state['values']['menu']['parent'])) {
+    list($node->menu['menu_name'], $node->menu['plid']) = explode(':', $form_state['values']['menu']['parent']);
+  }
+}
+
+/**
  * Act on a node that is being assembled before rendering.
  *
  * The module may add elements to $node->content prior to rendering. This hook

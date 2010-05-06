@@ -75,7 +75,13 @@ function node_add($type) {
   return $output;
 }
 
+/**
+ * Validate the node add/edit form.
+ */
 function node_form_validate($form, &$form_state) {
+  // @todo Legacy support. For Drupal 8, implement a clear and consistent
+  //   distinction between form validation and entity validation, rather than
+  //   casting arbitrary form values to mock entities.
   $node = (object) $form_state['values'];
   node_validate($node, $form);
 
@@ -89,14 +95,17 @@ function node_form_validate($form, &$form_state) {
  */
 function node_form($form, &$form_state, $node) {
   global $user;
-  // This form has its own multistep persistence.
-  if ($form_state['rebuild']) {
-    $form_state['input'] = array();
-  }
 
+  // If the form is being rebuilt after a submit handler updated
+  // $form_state['node'], use that. Otherwise, initialize $form_state['node']
+  // with the node object passed as a build argument.
   if (isset($form_state['node'])) {
     $node = (object) ($form_state['node'] + (array) $node);
   }
+  else {
+    $form_state['node'] = $node;
+  }
+
   if (isset($form_state['node_preview'])) {
     $form['#prefix'] = $form_state['node_preview'];
   }
@@ -141,7 +150,8 @@ function node_form($form, &$form_state, $node) {
     $form['title']['#weight'] = -5;
   }
 
-  $form['#node'] = $node;
+  // @todo Legacy support. Remove in Drupal 8.
+  $form['#node'] = $form_state['node'];
 
   $form['additional_settings'] = array(
     '#type' => 'vertical_tabs',
@@ -278,7 +288,6 @@ function node_form($form, &$form_state, $node) {
   }
   $form['#validate'][] = 'node_form_validate';
 
-  $form['#builder_function'] = 'node_form_submit_build_node';
   field_attach_form('node', $node, $form, $form_state, $node->language);
 
   return $form;
@@ -301,6 +310,7 @@ function node_form_delete_submit($form, &$form_state) {
 function node_form_build_preview($form, &$form_state) {
   $node = node_form_submit_build_node($form, $form_state);
   $form_state['node_preview'] = node_preview($node);
+  $form_state['rebuild'] = TRUE;
 }
 
 /**
@@ -398,7 +408,6 @@ function node_form_submit($form, &$form_state) {
     drupal_set_message(t('@type %title has been updated.', $t_args));
   }
   if ($node->nid) {
-    unset($form_state['rebuild']);
     $form_state['values']['nid'] = $node->nid;
     $form_state['nid'] = $node->nid;
     $form_state['redirect'] = 'node/' . $node->nid;
@@ -407,25 +416,42 @@ function node_form_submit($form, &$form_state) {
     // In the unlikely case something went wrong on save, the node will be
     // rebuilt and node form redisplayed the same way as in preview.
     drupal_set_message(t('The post could not be saved.'), 'error');
+    $form_state['rebuild'] = TRUE;
   }
   // Clear the page and block caches.
   cache_clear_all();
 }
 
 /**
- * Build a node by processing submitted form values and prepare for a form rebuild.
+ * Build a node from what was submitted on the add/edit form by processing the submitted form values.
+ *
+ * This function invokes submit handlers that assume a fully validated form, so
+ * do not call this function from button-level submit handlers of buttons that
+ * use #limit_validation_errors.
  */
 function node_form_submit_build_node($form, &$form_state) {
-  // Unset any button-level handlers, execute all the form-level submit
-  // functions to process the form values into an updated node.
+  // @todo Legacy support for modules that use a form-level submit handler to
+  //   extend the node being built. For the node to be built properly during a
+  //   multistep workflow, we must call these handlers even when this function
+  //   is called from a button-level submit handler (e.g.,
+  //   node_form_build_preview()). Module authors are encouraged to convert to
+  //   using hook_node_submit(). Remove this in Drupal 8.
   unset($form_state['submit_handlers']);
   form_execute_handlers('submit', $form, $form_state);
-  $node = node_submit((object) $form_state['values']);
 
+  // Execute all entity-level and field-level submit hooks.
+  $node = (object)($form_state['values'] + (array)$form_state['node']);
+  $node = node_submit($node);
   field_attach_submit('node', $node, $form, $form_state);
+  foreach (module_implements('node_submit') as $module) {
+    $function = $module . '_node_submit';
+    $function($node, $form, $form_state);
+  }
 
-  $form_state['node'] = (array) $node;
-  $form_state['rebuild'] = TRUE;
+  // There may be additional submit handlers that run after the one that calls
+  // this function, or one of the submit handlers may trigger a form rebuild, so
+  // store the built node in $form_state in addition to returning it.
+  $form_state['node'] = $node;
   return $node;
 }
 
