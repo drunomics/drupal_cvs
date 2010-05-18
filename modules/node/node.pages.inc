@@ -423,11 +423,14 @@ function node_form_submit($form, &$form_state) {
 }
 
 /**
- * Build a node by processing the submitted form values.
+ * Build the updated node by processing the submitted form values.
  *
  * This function invokes submit handlers that assume a fully validated form, so
  * do not call this function from button-level submit handlers of buttons that
  * use #limit_validation_errors.
+ * There may be additional submit handlers that run after the one that calls
+ * this function, or one of the submit handlers may trigger a form rebuild. For
+ * that the updated $node object is also available at $form_state['node'].
  */
 function node_form_submit_build_node($form, &$form_state) {
   // @todo Legacy support for modules that use a form-level submit handler to
@@ -439,19 +442,19 @@ function node_form_submit_build_node($form, &$form_state) {
   unset($form_state['submit_handlers']);
   form_execute_handlers('submit', $form, $form_state);
 
+  // Update the node object by copying over the submitted form values. In order
+  // to adapt the values hook_node_submit() may be used.
+  $node = $form_state['node'];
+  foreach ($form_state['values'] as $key => $value) {
+    $node->$key = $value;
+  }
   // Execute all entity-level and field-level submit hooks.
-  $node = (object) ($form_state['values'] + (array) $form_state['node']);
   $node = node_submit($node);
   field_attach_submit('node', $node, $form, $form_state);
   foreach (module_implements('node_submit') as $module) {
     $function = $module . '_node_submit';
     $function($node, $form, $form_state);
   }
-
-  // There may be additional submit handlers that run after the one that calls
-  // this function, or one of the submit handlers may trigger a form rebuild, so
-  // store the built node in $form_state in addition to returning it.
-  $form_state['node'] = $node;
   return $node;
 }
 
