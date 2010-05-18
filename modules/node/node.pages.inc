@@ -100,7 +100,7 @@ function node_form($form, &$form_state, $node) {
   // $form_state['node'], use that. Otherwise, initialize $form_state['node']
   // with the node object passed as a build argument.
   if (isset($form_state['node'])) {
-    $node = (object) ($form_state['node'] + (array) $node);
+    $node = $form_state['node'];
   }
   else {
     $form_state['node'] = $node;
