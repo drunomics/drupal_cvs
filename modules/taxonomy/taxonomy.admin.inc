@@ -617,23 +617,26 @@ function theme_taxonomy_overview_terms($variables) {
  * @see taxonomy_form_term_submit()
  */
 function taxonomy_form_term($form, &$form_state, $edit = array(), $vocabulary = NULL) {
-  if (!isset($vocabulary) && is_object($edit)) {
-    $vocabulary = taxonomy_vocabulary_load($edit->vid);
-    $edit = (array) $edit;
-  }
-  $edit += array(
-    'name' => '',
-    'description' => '',
-    'format' => filter_default_format(),
-    'vocabulary_machine_name' => $vocabulary->machine_name,
-    'tid' => NULL,
-    'weight' => 0,
-  );
-
   // During initial form build, add the term entity to the form state for use
   // during form building and processing. During a rebuild, use what is in the
   // form state.
-  $form_state += array('term' => (object) $edit);
+  if (!isset($vocabulary) && is_object($edit)) {
+    // A term entity has been passed.
+    $vocabulary = taxonomy_vocabulary_load($edit->vid);
+    $form_state += array('term' => $edit);
+  }
+  elseif (is_array($edit) && empty($form_state['term'])) {
+    // Initialize a new term entity with the passed data in $edit.
+    $edit += array(
+      'name' => '',
+      'description' => '',
+      'format' => filter_default_format(),
+      'vocabulary_machine_name' => $vocabulary->machine_name,
+      'tid' => NULL,
+      'weight' => 0,
+    );
+    $form_state['term'] = (object) $edit;
+  }
   $term = $form_state['term'];
 
   $parent = array_keys(taxonomy_get_parents($term->tid));
