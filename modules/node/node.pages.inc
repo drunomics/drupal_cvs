@@ -303,6 +303,7 @@ function node_form_delete_submit($form, &$form_state) {
 function node_form_build_preview($form, &$form_state) {
   $node = $form['#builder_function']($form, $form_state);
   $form_state['node_preview'] = node_preview($node);
+  $form_state['rebuild'] = TRUE;
 }
 
 /**
@@ -400,7 +401,6 @@ function node_form_submit($form, &$form_state) {
     drupal_set_message(t('@type %title has been updated.', $t_args));
   }
   if ($node->nid) {
-    unset($form_state['rebuild']);
     $form_state['values']['nid'] = $node->nid;
     $form_state['nid'] = $node->nid;
     $form_state['redirect'] = 'node/' . $node->nid;
@@ -443,10 +443,6 @@ function node_form_submit_build_node($form, &$form_state) {
     $function = $module . '_node_submit';
     $function($node, $form, $form_state);
   }
-
-  // @todo Legacy support. Remove in Drupal 8, as it is better for each button's
-  //   submit handler to decide whether to rebuild.
-  $form_state['rebuild'] = TRUE;
   return $node;
 }
 

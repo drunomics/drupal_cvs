@@ -848,10 +848,6 @@ function taxonomy_form_term_submit_builder($form, &$form_state) {
   $description = $form_state['values']['description'];
   $term->description = $description['value'];
   $term->format = $description['format'];
-
-  // @todo Legacy support. Remove in Drupal 8, as it is better for each button's
-  //   submit handler to decide whether to rebuild.
-  $form_state['rebuild'] = TRUE;
   return $term;
 }
 

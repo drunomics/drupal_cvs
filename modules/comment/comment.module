@@ -1950,6 +1950,7 @@ function comment_form($form, &$form_state, $comment) {
 function comment_form_build_preview($form, &$form_state) {
   $comment = $form['#builder_function']($form, $form_state);
   $form_state['comment_preview'] = comment_preview($comment);
+  $form_state['rebuild'] = TRUE;
 }
 
 /**
@@ -2118,9 +2119,6 @@ function comment_form_submit_build_comment($form, &$form_state) {
   entity_extract_non_field_form_values('comment', $comment, $form, $form_state);
   field_attach_submit('comment', $comment, $form, $form_state);
   comment_submit($comment);
-  // @todo Legacy support. Remove in Drupal 8, as it is better for each button's
-  //   submit handler to decide whether to rebuild.
-  $form_state['rebuild'] = TRUE;
   return $comment;
 }
 
@@ -2166,7 +2164,6 @@ function comment_form_submit($form, &$form_state) {
     // Redirect the user to the node they are commenting on.
     $redirect = 'node/' . $node->nid;
   }
-  unset($form_state['rebuild']);
   $form_state['redirect'] = $redirect;
   // Clear the block and page caches so that anonymous users see the comment
   // they have posted.
