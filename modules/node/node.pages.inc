@@ -142,7 +142,9 @@ function node_form($form, &$form_state, $node) {
   if (!isset($form['title']['#weight'])) {
     $form['title']['#weight'] = -5;
   }
-
+  // @todo Legacy support. Modules adding form building and processing functions
+  //   to the node form are encouraged to access the node using
+  //   $form_state['node']. Remove in Drupal 8.
   $form['#node'] = $node;
 
   $form['additional_settings'] = array(
