@@ -100,17 +100,28 @@ function theme_taxonomy_overview_vocabularies($variables) {
  * @see taxonomy_form_vocabulary_submit()
  */
 function taxonomy_form_vocabulary($form, &$form_state, $edit = array()) {
+  // During initial form build, add the entity to the form state for use
+  // during form building and processing. During a rebuild, use what is in the
+  // form state.
   if (!is_array($edit)) {
-    $edit = (array) $edit;
+    // A vocabulary entity has been passed.
+    $form_state += array('vocabulary' => $edit);
   }
-  $edit += array(
-    'name' => '',
-    'machine_name' => '',
-    'description' => '',
-    'hierarchy' => 0,
-    'weight' => 0,
-  );
-  $form['#vocabulary'] = (object) $edit;
+  elseif (empty($form_state['vocabulary'])) {
+    $edit += array(
+      'name' => '',
+      'machine_name' => '',
+      'description' => '',
+      'hierarchy' => 0,
+      'weight' => 0,
+    );
+    $form_state['vocabulary'] = (object) $edit;
+  }
+  $vocabulary = $form_state['vocabulary'];
+  // @todo Legacy support. Modules are encouraged to access the entity using
+  //   $form_state. Remove in Drupal 8.
+  $form['#vocabulary'] = $form_state['vocabulary'];
+
   // Check whether we need a deletion confirmation form.
   if (isset($form_state['confirm_delete']) && isset($form_state['values']['vid'])) {
     return taxonomy_vocabulary_confirm_delete($form, $form_state, $form_state['values']['vid']);
@@ -201,14 +212,14 @@ function taxonomy_form_vocabulary_validate($form, &$form_state) {
  * Accept the form submission for a vocabulary and save the results.
  */
 function taxonomy_form_vocabulary_submit($form, &$form_state) {
-  $old_vocabulary = $form['#vocabulary'];
+  $old_vocabulary = $form_state['vocabulary'];
   if ($form_state['clicked_button']['#value'] == t('Delete')) {
     // Rebuild the form to confirm vocabulary deletion.
     $form_state['rebuild'] = TRUE;
     $form_state['confirm_delete'] = TRUE;
     return;
   }
-  $vocabulary = (object) $form_state['values'];
+  entity_extract_non_field_form_values('taxonomy_vocabulary', $vocabulary, $form, $form_state);
   if ($vocabulary->machine_name != $old_vocabulary->machine_name) {
     field_attach_rename_bundle('taxonomy_term', $old_vocabulary->machine_name, $vocabulary->machine_name);
   }
