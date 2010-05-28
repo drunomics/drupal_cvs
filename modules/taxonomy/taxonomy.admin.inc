@@ -129,7 +129,7 @@ function taxonomy_form_vocabulary($form, &$form_state, $edit = array()) {
   $form['name'] = array(
     '#type' => 'textfield',
     '#title' => t('Name'),
-    '#default_value' => $edit['name'],
+    '#default_value' => $vocabulary->name,
     '#maxlength' => 255,
     '#required' => TRUE,
     '#field_suffix' => ' <small id="edit-name-suffix">&nbsp;</small>',
@@ -150,7 +150,7 @@ function taxonomy_form_vocabulary($form, &$form_state, $edit = array()) {
   $form['machine_name'] = array(
     '#type' => 'textfield',
     '#title' => t('Machine-readable name'),
-    '#default_value' => $edit['machine_name'],
+    '#default_value' => $vocabulary->machine_name,
     '#maxlength' => 255,
     '#description' => t('The unique machine-readable name for this vocabulary, used for theme templates. Can only contain lowercase letters, numbers, and underscores.'),
     '#required' => TRUE,
@@ -161,7 +161,7 @@ function taxonomy_form_vocabulary($form, &$form_state, $edit = array()) {
   $form['description'] = array(
     '#type' => 'textfield',
     '#title' => t('Description'),
-    '#default_value' => $edit['description'],
+    '#default_value' => $vocabulary->description,
   );
   // Set the hierarchy to "multiple parents" by default. This simplifies the
   // vocabulary form and standardizes the term form.
@@ -172,10 +172,10 @@ function taxonomy_form_vocabulary($form, &$form_state, $edit = array()) {
 
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array('#type' => 'submit', '#value' => t('Save'));
-  if (isset($edit['vid'])) {
+  if (isset($vocabulary->vid)) {
     $form['actions']['delete'] = array('#type' => 'submit', '#value' => t('Delete'));
-    $form['vid'] = array('#type' => 'value', '#value' => $edit['vid']);
-    $form['module'] = array('#type' => 'value', '#value' => $edit['module']);
+    $form['vid'] = array('#type' => 'value', '#value' => $vocabulary->vid);
+    $form['module'] = array('#type' => 'value', '#value' => $vocabulary->module);
   }
   return $form;
 }
@@ -212,16 +212,17 @@ function taxonomy_form_vocabulary_validate($form, &$form_state) {
  * Accept the form submission for a vocabulary and save the results.
  */
 function taxonomy_form_vocabulary_submit($form, &$form_state) {
-  $old_vocabulary = $form_state['vocabulary'];
   if ($form_state['clicked_button']['#value'] == t('Delete')) {
     // Rebuild the form to confirm vocabulary deletion.
     $form_state['rebuild'] = TRUE;
     $form_state['confirm_delete'] = TRUE;
     return;
   }
+  $old_machine_name = $form_state['vocabulary']->machine_name;
+  $vocabulary = $form_state['vocabulary'];
   entity_extract_non_field_form_values('taxonomy_vocabulary', $vocabulary, $form, $form_state);
-  if ($vocabulary->machine_name != $old_vocabulary->machine_name) {
-    field_attach_rename_bundle('taxonomy_term', $old_vocabulary->machine_name, $vocabulary->machine_name);
+  if ($vocabulary->machine_name != $old_machine_name) {
+    field_attach_rename_bundle('taxonomy_term', $old_machine_name, $vocabulary->machine_name);
   }
   switch (taxonomy_vocabulary_save($vocabulary)) {
     case SAVED_NEW:
