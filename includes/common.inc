@@ -6626,6 +6626,19 @@ function entity_invoke($op, $entity_type, $entity) {
 }
 
 /**
+ * Helper function for attaching field API validation to entity forms.
+ */
+function entity_form_field_validate($entity_type, $form, &$form_state) {
+  // All field attach API functions act on an entity object, but during form
+  // validation, we don't have one. $form_state contains the entity as it was
+  // prior to processing the current form submission, and we must not update it
+  // until we have fully validated the submitted input. Therefore, for
+  // validation, act on a pseudo entity created out of the form values.
+  $pseudo_entity = (object) $form_state['values'];
+  field_attach_form_validate($entity_type, $pseudo_entity, $form, $form_state);
+}
+
+/**
  * Copies submitted values of non-field form elements to entity properties.
  *
  * During the submission handling of an entity form's "Save", "Preview", and

@@ -763,10 +763,7 @@ function taxonomy_form_term($form, &$form_state, $edit = array(), $vocabulary = 
  * @see taxonomy_form_term()
  */
 function taxonomy_form_term_validate($form, &$form_state) {
-  // $form_state['term'] contains the actual entity being edited, but we must
-  // not update it with form values that have not yet been validated, so we
-  // create a pseudo-entity to use during validation.
-  field_attach_form_validate('taxonomy_term', (object) $form_state['values'], $form, $form_state);
+  entity_form_field_validate('taxonomy_term', $form, $form_state);
 
   // Ensure numeric values.
   if (isset($form_state['values']['weight']) && !is_numeric($form_state['values']['weight'])) {

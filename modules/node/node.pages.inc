@@ -84,7 +84,7 @@ function node_form_validate($form, &$form_state) {
 
   // Field validation. Requires access to $form_state, so this cannot be
   // done in node_validate() as it currently exists.
-  field_attach_form_validate('node', $node, $form, $form_state);
+  entity_form_field_validate('node', $form, $form_state);
 }
 
 /**

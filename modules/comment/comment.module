@@ -2016,12 +2016,7 @@ function comment_preview($comment) {
 function comment_form_validate($form, &$form_state) {
   global $user;
 
-  // $form_state['comment'] contains the actual entity being edited, but we must
-  // not update it with form values that have not yet been validated, so we
-  // create a pseudo-entity to use during validation.
-  $comment = (object) $form_state['values'];
-
-  field_attach_form_validate('comment', $comment, $form, $form_state);
+  entity_form_field_validate('comment', $form, $form_state);
 
   if (!empty($form_state['values']['cid'])) {
     if ($form_state['values']['date'] && strtotime($form_state['values']['date']) === FALSE) {
