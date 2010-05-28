@@ -243,6 +243,14 @@ function template_preprocess_user_profile_category(&$variables) {
 function user_profile_form($form, &$form_state, $account, $category = 'account') {
   global $user;
 
+  // During initial form build, add the entity to the form state for use during
+  // form building and processing. During a rebuild, use what is in the form
+  // state.
+  $form_state += array('user' => $account);
+  $account = $form_state['user'];
+
+  // @todo Legacy support. Modules are encouraged to access the entity using
+  //   $form_state. Remove in Drupal 8.
   $form['#user'] = $account;
   $form['#user_category'] = $category;
 
@@ -278,23 +286,22 @@ function user_profile_form($form, &$form_state, $account, $category = 'account')
  * Validation function for the user account and profile editing form.
  */
 function user_profile_form_validate($form, &$form_state) {
-  $edit = (object) $form_state['values'];
-  field_attach_form_validate('user', $edit, $form, $form_state);
+  entity_form_field_validate('user', $form, $form_state);
 }
 
 /**
  * Submit function for the user account and profile editing form.
  */
 function user_profile_form_submit($form, &$form_state) {
-  $account = $form['#user'];
+  $account = $form_state['user'];
   $category = $form['#user_category'];
   // Remove unneeded values.
   form_state_values_clean($form_state);
 
-  $edit = (object) $form_state['values'];
-  field_attach_submit('user', $edit, $form, $form_state);
-  $edit = (array) $edit;
+  entity_extract_non_field_form_values('user', $account, $form, $form_state);
+  field_attach_submit('user', $account, $form, $form_state);
 
+  $edit = (array) $account;
   user_save($account, $edit, $category);
   $form_state['values']['uid'] = $account->uid;
 
