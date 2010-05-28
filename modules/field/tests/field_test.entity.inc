@@ -264,10 +264,11 @@ function field_test_entity_edit($entity) {
  * Test_entity form.
  */
 function field_test_entity_form($form, &$form_state, $entity, $add = FALSE) {
-  if (isset($form_state['test_entity'])) {
-    $entity = $form_state['test_entity'] + (array) $entity;
-  }
-  $entity = (object) $entity;
+  // During initial form build, add the entity to the form state for use during
+  // form building and processing. During a rebuild, use what is in the form
+  // state.
+  $form_state += array('test_entity' => $entity);
+  $entity = $form_state['test_entity'];
 
   foreach (array('ftid', 'ftvid', 'fttype') as $key) {
     $form[$key] = array(
@@ -310,7 +311,7 @@ function field_test_entity_form_validate($form, &$form_state) {
  * Submit handler for field_test_entity_form().
  */
 function field_test_entity_form_submit($form, &$form_state) {
-  $entity = field_test_entity_form_submit_builder($form, $form_state);
+  $entity = $form['#builder_function']($form, $form_state);
   $insert = empty($entity->ftid);
   field_test_entity_save($entity);
 
@@ -318,25 +319,21 @@ function field_test_entity_form_submit($form, &$form_state) {
   drupal_set_message($message);
 
   if ($entity->ftid) {
-    unset($form_state['rebuild']);
     $form_state['redirect'] = 'test-entity/' . $entity->ftid . '/edit';
   }
   else {
     // Error on save.
     drupal_set_message(t('The entity could not be saved.'), 'error');
+    $form_state['rebuild'] = TRUE;
   }
 }
 
 /**
- * Builds a test_entity from submitted form values.
+ * Updates the form state's entity by processing this submission's values.
  */
 function field_test_entity_form_submit_builder($form, &$form_state) {
-  $entity = field_test_create_stub_entity($form_state['values']['ftid'], $form_state['values']['ftvid'], $form_state['values']['fttype']);
-  $entity->revision = !empty($form_state['values']['revision']);
+  $entity = $form_state['test_entity'];
+  entity_extract_non_field_form_values('test_entity', $entity, $form, $form_state);
   field_attach_submit('test_entity', $entity, $form, $form_state);
-
-  $form_state['test_entity'] = (array) $entity;
-  $form_state['rebuild'] = TRUE;
-
   return $entity;
 }

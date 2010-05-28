@@ -630,20 +630,21 @@ function taxonomy_form_term($form, &$form_state, $edit = array(), $vocabulary = 
     'weight' => 0,
   );
 
-  // Take into account multi-step rebuilding.
-  if (isset($form_state['term'])) {
-    $edit = $form_state['term'] + $edit;
-  }
+  // During initial form build, add the term entity to the form state for use
+  // during form building and processing. During a rebuild, use what is in the
+  // form state.
+  $form_state += array('term' => (object) $edit);
+  $term = $form_state['term'];
 
-  $parent = array_keys(taxonomy_get_parents($edit['tid']));
-  $form['#term'] = $edit;
+  $parent = array_keys(taxonomy_get_parents($term->tid));
+  $form['#term'] = (array) $term;
   $form['#term']['parent'] = $parent;
   $form['#vocabulary'] = $vocabulary;
   $form['#builder_function'] = 'taxonomy_form_term_submit_builder';
 
   // Check for confirmation forms.
   if (isset($form_state['confirm_delete'])) {
-    return array_merge($form, taxonomy_term_confirm_delete($form, $form_state, $edit['tid']));
+    return array_merge($form, taxonomy_term_confirm_delete($form, $form_state, $term->tid));
   }
   elseif (isset($form_state['confirm_parents'])) {
     return array_merge($form, taxonomy_term_confirm_parents($form, $form_state, $vocabulary));
@@ -652,7 +653,7 @@ function taxonomy_form_term($form, &$form_state, $edit = array(), $vocabulary = 
   $form['name'] = array(
     '#type' => 'textfield',
     '#title' => t('Name'),
-    '#default_value' => $edit['name'],
+    '#default_value' => $term->name,
     '#maxlength' => 255,
     '#required' => TRUE,
     '#weight' => -5,
@@ -660,18 +661,18 @@ function taxonomy_form_term($form, &$form_state, $edit = array(), $vocabulary = 
   $form['description'] = array(
     '#type' => 'text_format',
     '#title' => t('Description'),
-    '#default_value' => $edit['description'],
-    '#format' => $edit['format'],
+    '#default_value' => $term->description,
+    '#format' => $term->format,
     '#weight' => 0,
   );
 
   $form['vocabulary_machine_name'] = array(
     '#type' => 'textfield',
     '#access' => FALSE,
-    '#value' => isset($edit['vocabulary_machine_name']) ? $edit['vocabulary_machine_name'] : $vocabulary->name,
+    '#value' => isset($term->vocabulary_machine_name) ? $term->vocabulary_machine_name : $vocabulary->name,
   );
 
-  field_attach_form('taxonomy_term', (object) $edit, $form, $form_state);
+  field_attach_form('taxonomy_term', $term, $form, $form_state);
 
   $form['relations'] = array(
     '#type' => 'fieldset',
@@ -686,23 +687,23 @@ function taxonomy_form_term($form, &$form_state, $edit = array(), $vocabulary = 
   // full vocabulary. Contrib modules can then intercept before
   // hook_form_alter to provide scalable alternatives.
   if (!variable_get('taxonomy_override_selector', FALSE)) {
-    $parent = array_keys(taxonomy_get_parents($edit['tid']));
-    $children = taxonomy_get_tree($vocabulary->vid, $edit['tid']);
+    $parent = array_keys(taxonomy_get_parents($term->tid));
+    $children = taxonomy_get_tree($vocabulary->vid, $term->tid);
 
     // A term can't be the child of itself, nor of its children.
     foreach ($children as $child) {
       $exclude[] = $child->tid;
     }
-    $exclude[] = $edit['tid'];
+    $exclude[] = $term->tid;
 
     $tree = taxonomy_get_tree($vocabulary->vid);
     $options = array('<' . t('root') . '>');
     if (empty($parent)) {
       $parent = array(0);
     }
-    foreach ($tree as $term) {
-      if (!in_array($term->tid, $exclude)) {
-        $options[$term->tid] = str_repeat('-', $term->depth) . $term->name;
+    foreach ($tree as $item) {
+      if (!in_array($item->tid, $exclude)) {
+        $options[$item->tid] = str_repeat('-', $item->depth) . $item->name;
       }
     }
     $form['relations']['parent'] = array(
@@ -718,7 +719,7 @@ function taxonomy_form_term($form, &$form_state, $edit = array(), $vocabulary = 
     '#type' => 'textfield',
     '#title' => t('Weight'),
     '#size' => 6,
-    '#default_value' => $edit['weight'],
+    '#default_value' => $term->weight,
     '#description' => t('Terms are displayed in ascending order by weight.'),
     '#required' => TRUE,
   );
@@ -728,7 +729,7 @@ function taxonomy_form_term($form, &$form_state, $edit = array(), $vocabulary = 
   );
   $form['tid'] = array(
     '#type' => 'value',
-    '#value' => $edit['tid'],
+    '#value' => $term->tid,
   );
 
   $form['actions'] = array('#type' => 'actions');
@@ -738,7 +739,7 @@ function taxonomy_form_term($form, &$form_state, $edit = array(), $vocabulary = 
     '#weight' => 5,
   );
 
-  if ($edit['tid']) {
+  if ($term->tid) {
     $form['actions']['delete'] = array(
       '#type' => 'submit',
       '#value' => t('Delete'),
@@ -759,6 +760,9 @@ function taxonomy_form_term($form, &$form_state, $edit = array(), $vocabulary = 
  * @see taxonomy_form_term()
  */
 function taxonomy_form_term_validate($form, &$form_state) {
+  // $form_state['term'] contains the actual entity being edited, but we must
+  // not update it with form values that have not yet been validated, so we
+  // create a pseudo-entity to use during validation.
   field_attach_form_validate('taxonomy_term', (object) $form_state['values'], $form, $form_state);
 
   // Ensure numeric values.
@@ -790,7 +794,7 @@ function taxonomy_form_term_submit($form, &$form_state) {
     return;
   }
 
-  $term = taxonomy_form_term_submit_builder($form, $form_state);
+  $term = $form['#builder_function']($form, $form_state);
 
   $status = taxonomy_term_save($term);
   switch ($status) {
@@ -833,21 +837,21 @@ function taxonomy_form_term_submit($form, &$form_state) {
 }
 
 /**
- * Build a term by processing form values and prepare for a form rebuild.
+ * Updates the form state's term entity by processing this submission's values.
  */
 function taxonomy_form_term_submit_builder($form, &$form_state) {
-  $term = (object) $form_state['values'];
+  $term = $form_state['term'];
+  entity_extract_non_field_form_values('taxonomy_term', $term, $form, $form_state);
+  field_attach_submit('taxonomy_term', $term, $form, $form_state);
 
   // Convert text_format field into values expected by taxonomy_term_save().
   $description = $form_state['values']['description'];
   $term->description = $description['value'];
   $term->format = $description['format'];
 
-  field_attach_submit('taxonomy_term', $term, $form, $form_state);
-
-  $form_state['term'] = (array) $term;
+  // @todo Legacy support. Remove in Drupal 8, as it is better for each button's
+  //   submit handler to decide whether to rebuild.
   $form_state['rebuild'] = TRUE;
-
   return $term;
 }
 

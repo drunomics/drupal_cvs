@@ -6626,6 +6626,37 @@ function entity_invoke($op, $entity_type, $entity) {
 }
 
 /**
+ * Copies submitted values of non-field form elements to entity properties.
+ *
+ * During the submission handling of an entity form's "Save", "Preview", and
+ * possibly other buttons, the form state's entity needs to be updated with the
+ * submitted form values. Each entity form implements its own
+ * $form['#builder_function'] for doing this, appropriate for the particular
+ * entity and form. If the form is for a fieldable entity and has fields
+ * attached, that function should call field_attach_submit() for copying the
+ * field values to the entity. If the form has non-field form elements and needs
+ * those copied to entity properties, it may call this function, which copies
+ * $form_state['values'][PROPERTY] to $entity->PROPERTY for all entries in
+ * $form_state['values'] that are not field data. If the entity form includes
+ * elements with values that should not be copied to the entity in this way, it
+ * should not call this function and instead implement the required logic to get
+ * the correct form values into the entity.
+ */
+function entity_extract_non_field_form_values($entity_type, $entity, $form, &$form_state) {
+  $info = entity_get_info($entity_type);
+  list(, , $bundle) = entity_extract_ids($entity_type, $entity);
+
+  // Exclude fields, because they require special logic that is handled by
+  // field_attach_form_submit().
+  $values_excluding_fields = $info['fieldable'] ? array_diff_key($form_state['values'], field_info_instances($entity_type, $bundle)) : $form_state['values'];
+
+  // Do not overwrite entity properties not being edited by the form.
+  foreach ($values_excluding_fields as $key => $value) {
+    $entity->$key = $value;
+  }
+}
+
+/**
  * Performs one or more XML-RPC request(s).
  *
  * @param $url
