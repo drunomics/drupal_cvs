@@ -302,6 +302,10 @@ function user_profile_form_submit($form, &$form_state) {
   field_attach_submit('user', $account, $form, $form_state);
 
   $edit = (array) $account;
+  // Care for the password to be only updated, if the form contains it. Else
+  // 'pass' contains the hashed current password, so we must not save that.
+  $edit['pass'] = isset($form_state['values']['pass']) ? $form_state['values']['pass'] : NULL;
+
   user_save($account, $edit, $category);
   $form_state['values']['uid'] = $account->uid;
 
