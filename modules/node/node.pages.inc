@@ -428,10 +428,7 @@ function node_form_submit($form, &$form_state) {
  * @see node_form()
  */
 function node_form_submit_build_node($form, &$form_state) {
-  // @todo Legacy support for modules that extend the node form with form-level
-  //   submit handlers that must run every time the form state's node entity is
-  //   updated regardless which button ("Save", "Preview", etc.) triggered the
-  //   submission. Remove this in Drupal 8. Module authors are encouraged to use
+  // @todo Improve this in Drupal 8. Module authors are encouraged to use
   //   hook_node_submit().
   unset($form_state['submit_handlers']);
   form_execute_handlers('submit', $form, $form_state);
