@@ -411,6 +411,7 @@ function node_form_submit($form, &$form_state) {
     // In the unlikely case something went wrong on save, the node will be
     // rebuilt and node form redisplayed the same way as in preview.
     drupal_set_message(t('The post could not be saved.'), 'error');
+    $form_state['rebuild'] = TRUE;
   }
   // Clear the page and block caches.
   cache_clear_all();
