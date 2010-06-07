@@ -301,13 +301,9 @@ function user_profile_form_submit($form, &$form_state) {
   entity_extract_non_field_form_values('user', $account, $form, $form_state);
   field_attach_submit('user', $account, $form, $form_state);
 
-  // Put all account properties in $edit regardless they were actually edited,
-  // as $edit will be used for invoking field API attachers. This ensures that
-  // fields that did not appear in the form don't loose their values.
-  $edit = (array) $account;
-  // Care for the password to be only updated, if the form contains it. Else
-  // 'pass' contains the hashed current password, so we must not save that.
-  $edit['pass'] = isset($form_state['values']['pass']) ? $form_state['values']['pass'] : NULL;
+  // Populate $edit with the properties of $account, which have been edited on
+  // this form by taking over all values, which appear in the form values too.
+  $edit = array_intersect_key((array) $account, $form_state['values']);
 
   user_save($account, $edit, $category);
   $form_state['values']['uid'] = $account->uid;
