@@ -1312,6 +1312,13 @@ function form_set_error($name = NULL, $message = '') {
 }
 
 /**
+ * Clear all errors against all form elements made by form_set_error().
+ */
+function form_clear_error() {
+  drupal_static_reset('form_set_error');
+}
+
+/**
  * Return an associative array of all errors.
  */
 function form_get_errors() {
