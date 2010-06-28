@@ -1537,19 +1537,6 @@ function form_builder($form_id, $element, &$form_state) {
       $form_state['submitted'] = TRUE;
     }
 
-    // If validation errors are limited make sure there are no unvalidated
-    // values left in the the form values.
-    if (isset($form_state['triggering_element']['#limit_validation_errors']) && $form_state['triggering_element']['#limit_validation_errors'] !== FALSE) {
-      $values = array();
-      foreach ($form_state['triggering_element']['#limit_validation_errors'] as $sections) {
-        list($value, $value_exists) = drupal_get_array_deep($form_state['values'], $sections);
-        if ($value_exists) {
-          drupal_set_array_deep($values, $sections, $value);
-        }
-      }
-      $form_state['values'] = $values;
-    }
-
     // Special processing if the triggering element is a button.
     if (isset($form_state['triggering_element']['#button_type'])) {
       // Because there are several ways in which the triggering element could
