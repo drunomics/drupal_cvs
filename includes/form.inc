@@ -1332,6 +1332,11 @@ function form_set_error($name = NULL, $message = '', $limit_validation_errors = 
         drupal_set_message($message, 'error');
       }
     }
+    else {
+      // We do not record the validation failure, but in order to ensure safe
+      // form values we remove the value of the element failing validation.
+      drupal_set_array_deep($form_state['values'], explode('][', $name), NULL);
+    }
   }
 }
 
