@@ -939,10 +939,36 @@ function drupal_validate_form($form_id, &$form, &$form_state) {
   // If the session token was set by drupal_prepare_form(), ensure that it
   // matches the current user's session.
   if (isset($form['#token'])) {
-    if (!drupal_valid_token($form['form_token']['#value'], $form['#token'])) {
+    if (!drupal_valid_token($form_state['values']['form_token'], $form['#token'])) {
       // Setting this error will cause the form to fail validation.
       form_set_error('form_token', t('Validation error, please try again. If this error persists, please contact the site administrator.'));
     }
+  }
+
+  // While this form is being validated, it may be desired that some calls
+  // to form_set_error() be suppressed and not result in a form error, so
+  // that a button that implements low-risk functionality (such as "Previous"
+  // or "Add more") that doesn't require all user input to be valid can still
+  // have its submit handlers triggered. The triggering element's
+  // #limit_validation_errors property contains the information for which
+  // errors are needed, and all other errors are to be suppressed. The
+  // #limit_validation_errors property is ignored if submit handlers will run,
+  // but the element doesn't have a #submit property, because it's too large a
+  // security risk to have any invalid user input when executing form-level
+  // submit handlers.
+  if (isset($form_state['triggering_element']['#limit_validation_errors']) && $form_state['submitted'] && !isset($form_state['triggering_element']['#submit'])) {
+    $form_state['triggering_element']['#limit_validation_errors'] = FALSE;
+  }
+  // If submit handlers won't run (due to the submission having been triggered
+  // by an element whose #executes_submit_callback property isn't TRUE), then
+  // it's safe to suppress all validation errors, and we do so by default,
+  // which is particularly useful during an AJAX submission triggered by a
+  // non-button. An element can override this default by setting the
+  // #limit_validation_errors property. For button element types,
+  // #limit_validation_errors defaults to FALSE (via system_element_info()),
+  // so that full validation is their default behavior.
+  elseif (isset($form_state['triggering_element']) && !isset($form_state['triggering_element']['#limit_validation_errors']) && !$form_state['submitted']) {
+    $form_state['triggering_element']['#limit_validation_errors'] = array();
   }
 
   _form_validate($form, $form_state, $form_id);
@@ -1080,39 +1106,6 @@ function _form_validate(&$elements, &$form_state, $form_id = NULL) {
       }
     }
 
-    // While this element is being validated, it may be desired that some calls
-    // to form_set_error() be suppressed and not result in a form error, so
-    // that a button that implements low-risk functionality (such as "Previous"
-    // or "Add more") that doesn't require all user input to be valid can still
-    // have its submit handlers triggered. The triggering element's
-    // #limit_validation_errors property contains the information for which
-    // errors are needed, and all other errors are to be suppressed. The
-    // #limit_validation_errors property is ignored if submit handlers will run,
-    // but the element doesn't have a #submit property, because it's too large a
-    // security risk to have any invalid user input when executing form-level
-    // submit handlers.
-    if (isset($form_state['triggering_element']['#limit_validation_errors']) && ($form_state['triggering_element']['#limit_validation_errors'] !== FALSE) && !($form_state['submitted'] && !isset($form_state['triggering_element']['#submit']))) {
-      form_set_error(NULL, '', $form_state['triggering_element']['#limit_validation_errors']);
-    }
-    // If submit handlers won't run (due to the submission having been triggered
-    // by an element whose #executes_submit_callback property isn't TRUE), then
-    // it's safe to suppress all validation errors, and we do so by default,
-    // which is particularly useful during an AJAX submission triggered by a
-    // non-button. An element can override this default by setting the
-    // #limit_validation_errors property. For button element types,
-    // #limit_validation_errors defaults to FALSE (via system_element_info()),
-    // so that full validation is their default behavior.
-    elseif (isset($form_state['triggering_element']) && !isset($form_state['triggering_element']['#limit_validation_errors']) && !$form_state['submitted']) {
-      form_set_error(NULL, '', array());
-    }
-    // As an extra security measure, explicitly turn off error suppression if
-    // one of the above conditions wasn't met. Since this is also done at the
-    // end of this function, doing it here is only to handle the rare edge case
-    // where a validate handler invokes form processing of another form.
-    else {
-      drupal_static_reset('form_set_error:limit_validation_errors');
-    }
-
     // Make sure a value is passed when the field is required.
     // A simple call to empty() will not cut it here as some fields, like
     // checkboxes, can return a valid value of '0'. Instead, check the
@@ -1136,11 +1129,6 @@ function _form_validate(&$elements, &$form_state, $form_id = NULL) {
     }
     $elements['#validated'] = TRUE;
   }
-
-  // Done validating this element, so turn off error suppression.
-  // _form_validate() turns it on again when starting on the next element, if
-  // it's still appropriate to do so.
-  drupal_static_reset('form_set_error:limit_validation_errors');
 }
 
 /**
@@ -1278,17 +1266,15 @@ function form_execute_handlers($type, &$form, &$form_state) {
  *   element where the #parents array starts with 'foo'.
  * @param $message
  *   The error message to present to the user.
- * @param $limit_validation_errors
- *   Internal use only. The #limit_validation_errors property of the clicked
- *   button, if it exists.
  */
-function form_set_error($name = NULL, $message = '', $limit_validation_errors = NULL) {
+function form_set_error($name = NULL, $message = '') {
   $form_errors = &drupal_static(__FUNCTION__, array());
-  $sections = &drupal_static(__FUNCTION__ . ':limit_validation_errors');
-  if (isset($limit_validation_errors)) {
-    $sections = $limit_validation_errors;
-  }
+  $static = &drupal_get_processed_form();
+  $form_state = &$static[1];
 
+  if (isset($form_state['triggering_element']['#limit_validation_errors']) && $form_state['triggering_element']['#limit_validation_errors'] !== FALSE) {
+    $sections = $form_state['triggering_element']['#limit_validation_errors'];
+  }
   if (isset($name) && !isset($form_errors[$name])) {
     $record = TRUE;
     if (isset($sections)) {
@@ -1321,8 +1307,6 @@ function form_set_error($name = NULL, $message = '', $limit_validation_errors = 
     else {
       // We do not record the validation failure, but in order to ensure safe
       // form values we remove the value of the element failing validation.
-      $static = &drupal_get_processed_form();
-      $form_state = &$static[1];
       drupal_set_array_deep($form_state['values'], explode('][', $name), NULL);
     }
   }
