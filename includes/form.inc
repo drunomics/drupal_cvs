@@ -795,7 +795,6 @@ function drupal_process_form($form_id, &$form, &$form_state) {
  *
  * @see drupal_get_processed_form()
  * @see form_set_error()
- * @see form_get_errors()
  * @see drupal_process_form()
  */
 function drupal_set_processed_form(&$form, &$form_state) {
