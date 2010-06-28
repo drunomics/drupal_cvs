@@ -385,7 +385,6 @@ function form_state_defaults() {
     'method' => 'post',
     'groups' => array(),
     'buttons' => array(),
-    'errors' => array(),
   );
 }
 
@@ -524,7 +523,6 @@ function form_state_keys_no_cache() {
     'triggering_element',
     'clicked_button',
     'complete form',
-    'errors',
     'groups',
     'input',
     'method',
@@ -608,6 +606,7 @@ function drupal_form_submit($form_id, &$form_state) {
 
   // Reset form validation.
   $form_state['must_validate'] = TRUE;
+  form_clear_error();
 
   drupal_prepare_form($form_id, $form, $form_state);
   drupal_process_form($form_id, $form, $form_state);
@@ -1284,16 +1283,13 @@ function form_execute_handlers($type, &$form, &$form_state) {
  *   button, if it exists.
  */
 function form_set_error($name = NULL, $message = '', $limit_validation_errors = NULL) {
-  $static = &drupal_get_processed_form();
-  $form_state = &$static[1];
-  $form = &$static[0];
-
+  $form_errors = &drupal_static(__FUNCTION__, array());
   $sections = &drupal_static(__FUNCTION__ . ':limit_validation_errors');
   if (isset($limit_validation_errors)) {
     $sections = $limit_validation_errors;
   }
 
-  if (isset($name) && !isset($form_state['errors'][$name])) {
+  if (isset($name) && !isset($form_errors[$name])) {
     $record = TRUE;
     if (isset($sections)) {
       // #limit_validation_errors is an array of "sections" within which user
@@ -1317,17 +1313,7 @@ function form_set_error($name = NULL, $message = '', $limit_validation_errors = 
       }
     }
     if ($record) {
-      // Set the error in the element, such that the element can render it.
-      if ($name) {
-        $keys = explode('][', $name);
-        list($element, $element_exists) = drupal_get_array_deep($form, $keys);
-        if ($element_exists) {
-          $element['#error'] = $message;
-          drupal_set_array_deep($form, $keys, $element);
-        }
-      }
-      // Maintain a list of errors for the whole form and output the message.
-      $form_state['errors'][$name] = $message;
+      $form_errors[$name] = $message;
       if ($message) {
         drupal_set_message($message, 'error');
       }
@@ -1335,6 +1321,8 @@ function form_set_error($name = NULL, $message = '', $limit_validation_errors = 
     else {
       // We do not record the validation failure, but in order to ensure safe
       // form values we remove the value of the element failing validation.
+      $static = &drupal_get_processed_form();
+      $form_state = &$static[1];
       drupal_set_array_deep($form_state['values'], explode('][', $name), NULL);
     }
   }
@@ -1344,9 +1332,9 @@ function form_set_error($name = NULL, $message = '', $limit_validation_errors = 
  * Return an associative array of all errors.
  */
 function form_get_errors() {
-  $static = &drupal_get_processed_form();
-  if ($form_state = &$static[1]) {
-    return $form_state['errors'];
+  $form = &drupal_static('form_set_error', array());
+  if (!empty($form)) {
+    return $form;
   }
 }
 
@@ -1354,16 +1342,14 @@ function form_get_errors() {
  * Return the error message filed against the form with the specified name.
  */
 function form_get_error($element) {
-  $static = &drupal_get_processed_form();
-  if ($form_state = &$static[1]) {
-    $key = $element['#parents'][0];
-    if (isset($form_state['errors'][$key])) {
-      return $form_state['errors'][$key];
-    }
-    $key = implode('][', $element['#parents']);
-    if (isset($form_state['errors'][$key])) {
-      return $form_state['errors'][$key];
-    }
+  $form = &drupal_static('form_set_error', array());
+  $key = $element['#parents'][0];
+  if (isset($form[$key])) {
+    return $form[$key];
+  }
+  $key = implode('][', $element['#parents']);
+  if (isset($form[$key])) {
+    return $form[$key];
   }
 }
 
@@ -3338,7 +3324,7 @@ function _form_set_class(&$element, $class = array()) {
   if ($element['#required']) {
     $element['#attributes']['class'][] = 'required';
   }
-  if (isset($element['#error'])) {
+  if (form_get_error($element)) {
     $element['#attributes']['class'][] = 'error';
   }
 }
