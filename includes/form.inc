@@ -909,7 +909,7 @@ function drupal_validate_form($form_id, &$form, &$form_state) {
   // If the session token was set by drupal_prepare_form(), ensure that it
   // matches the current user's session.
   if (isset($form['#token'])) {
-    if (!drupal_valid_token($form_state['values']['form_token'], $form['#token'])) {
+    if (!drupal_valid_token($form['form_token']['#value'], $form['#token'])) {
       // Setting this error will cause the form to fail validation.
       form_set_error('form_token', t('Validation error, please try again. If this error persists, please contact the site administrator.'));
     }
@@ -1577,6 +1577,19 @@ function form_builder($form_id, $element, &$form_state) {
       $form_state['submitted'] = TRUE;
     }
 
+    // If validation errors are limited make sure there are no unvalidated
+    // values left in the the form values.
+    if (isset($form_state['triggering_element']['#limit_validation_errors']) && $form_state['triggering_element']['#limit_validation_errors'] !== FALSE) {
+      $values = array();
+      foreach ($form_state['triggering_element']['#limit_validation_errors'] as $sections) {
+        list($value, $value_exists) = drupal_get_array_deep($form_state['values'], $sections);
+        if ($value_exists) {
+          drupal_set_array_deep($values, $sections, $value);
+        }
+      }
+      $form_state['values'] = $values;
+    }
+
     // Special processing if the triggering element is a button.
     if (isset($form_state['triggering_element']['#button_type'])) {
       // Because there are several ways in which the triggering element could
@@ -1683,11 +1696,9 @@ function _form_builder_handle_input_element($form_id, &$element, &$form_state) {
       // submit explicit NULL values when calling drupal_form_submit(), so we do
       // not modify $form_state['input'] for them.
       if (!$input_exists && !$form_state['rebuild'] && !$form_state['programmed']) {
-        // We leverage the internal logic of form_set_value() to change the
-        // input values by passing $form_state['input'] instead of the usual
-        // $form_state['values']. In effect, this adds the necessary parent keys
-        // to $form_state['input'] and sets the element's input value to NULL.
-        _form_set_value($form_state['input'], $element, $element['#parents'], NULL);
+        // Add the necessary parent keys to $form_state['input'] and sets the
+        // element's input value to NULL.
+        drupal_set_array_deep($form_state['input'], $element['#parents'], NULL);
         $input_exists = TRUE;
       }
       // If we have input for the current element, assign it to the #value
@@ -2082,26 +2093,7 @@ function form_type_token_value($element, $input = FALSE) {
  *   Form state array where the value change should be recorded.
  */
 function form_set_value($element, $value, &$form_state) {
-  _form_set_value($form_state['values'], $element, $element['#parents'], $value);
-}
-
-/**
- * Helper function for form_set_value() and _form_builder_handle_input_element().
- *
- * We iterate over $parents and create nested arrays for them in $form_values if
- * needed. Then we insert the value into the last parent key.
- */
-function _form_set_value(&$form_values, $element, $parents, $value) {
-  $parent = array_shift($parents);
-  if (empty($parents)) {
-    $form_values[$parent] = $value;
-  }
-  else {
-    if (!isset($form_values[$parent])) {
-      $form_values[$parent] = array();
-    }
-    _form_set_value($form_values[$parent], $element, $parents, $value);
-  }
+  drupal_set_array_deep($form_state['values'], $element['#parents'], $value);
 }
 
 /**
