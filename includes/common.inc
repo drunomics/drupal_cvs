@@ -5506,6 +5506,54 @@ function element_get_visible_children(array $elements) {
 }
 
 /**
+ * Sets a value in a deeply nested array.
+ *
+ * @param $array
+ *   A reference to the array to modify.
+ * @param $parents
+ *   An ordered array of parent keys, starting with the outer most entry.
+ * @param $value
+ *   The value to set.
+ */
+function drupal_set_array_deep(&$array, $parents, $value) {
+  $parent = array_shift($parents);
+  if (empty($parents)) {
+    $array[$parent] = $value;
+  }
+  else {
+    if (!isset($array[$parent])) {
+      $array[$parent] = array();
+    }
+    drupal_set_array_deep($array[$parent], $parents, $value);
+  }
+}
+
+/**
+ * Gets a value sitting in a deeply nested array.
+ *
+ * @param $array
+ *   The array from which to get a value.
+ * @param $parents
+ *   An ordered array of parent keys of the value, starting with the outer most
+ *   entry.
+ * @return
+ *   An array with the first entry being the value. As second entry a boolean
+ *   flag is returned, which determines whether all given parent keys are set.
+ */
+function drupal_get_array_deep($array, $parents) {
+  $parent = array_shift($parents);
+  if (array_key_exists($parent, $array)) {
+    if (empty($parents)) {
+      return array($array[$parent], TRUE);
+    }
+    if (is_array($array[$parent])) {
+      return drupal_get_array_deep($array[$parent], $parents);
+    }
+  }
+  return array(NULL, FALSE);
+}
+
+/**
  * Provide theme registration for themes across .inc files.
  */
 function drupal_common_theme() {
