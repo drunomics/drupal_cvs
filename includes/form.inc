@@ -385,6 +385,7 @@ function form_state_defaults() {
     'method' => 'post',
     'groups' => array(),
     'buttons' => array(),
+    'errors' => array(),
   );
 }
 
@@ -523,6 +524,7 @@ function form_state_keys_no_cache() {
     'triggering_element',
     'clicked_button',
     'complete form',
+    'errors',
     'groups',
     'input',
     'method',
@@ -606,7 +608,6 @@ function drupal_form_submit($form_id, &$form_state) {
 
   // Reset form validation.
   $form_state['must_validate'] = TRUE;
-  form_clear_error();
 
   drupal_prepare_form($form_id, $form, $form_state);
   drupal_process_form($form_id, $form, $form_state);
@@ -709,6 +710,7 @@ function drupal_retrieve_form($form_id, &$form_state) {
  *   data, is also accumulated here.
  */
 function drupal_process_form($form_id, &$form, &$form_state) {
+  drupal_set_processed_form($form, $form_state);
   $form_state['values'] = array();
 
   // With $_GET, these forms are always submitted if requested.
@@ -785,6 +787,35 @@ function drupal_process_form($form_id, &$form, &$form_state) {
       drupal_redirect_form($form_state);
     }
   }
+  // Reset the currently processed form.
+  drupal_static_reset('drupal_processed_form');
+}
+
+/**
+ * Sets the currently processed form.
+ *
+ * @see drupal_get_processed_form()
+ * @see form_set_error()
+ * @see form_get_errors()
+ * @see drupal_process_form()
+ */
+function drupal_set_processed_form(&$form, &$form_state) {
+  $processed_form = &drupal_static('drupal_processed_form');
+  $processed_form = array(&$form, &$form_state);
+}
+
+/**
+ * Returns the currently processed form.
+ *
+ * @return
+ *   An array containing two elements, the currently processed form and its
+ *   form state. If there is currently no form processed, both entries are NULL.
+ *
+ * @see drupal_set_processed_form()
+ */
+function &drupal_get_processed_form() {
+  $processed_form = &drupal_static('drupal_processed_form', array(0 => NULL, 1 => NULL));
+  return $processed_form;
 }
 
 /**
@@ -1251,19 +1282,18 @@ function form_execute_handlers($type, &$form, &$form_state) {
  * @param $limit_validation_errors
  *   Internal use only. The #limit_validation_errors property of the clicked
  *   button, if it exists.
- *
- * @return
- *   Return value is for internal use only. To get a list of errors, use
- *   form_get_errors() or form_get_error().
  */
 function form_set_error($name = NULL, $message = '', $limit_validation_errors = NULL) {
-  $form = &drupal_static(__FUNCTION__, array());
+  $static = &drupal_get_processed_form();
+  $form_state = &$static[1];
+  $form = &$static[0];
+
   $sections = &drupal_static(__FUNCTION__ . ':limit_validation_errors');
   if (isset($limit_validation_errors)) {
     $sections = $limit_validation_errors;
   }
 
-  if (isset($name) && !isset($form[$name])) {
+  if (isset($name) && !isset($form_state['errors'][$name])) {
     $record = TRUE;
     if (isset($sections)) {
       // #limit_validation_errors is an array of "sections" within which user
@@ -1287,30 +1317,31 @@ function form_set_error($name = NULL, $message = '', $limit_validation_errors = 
       }
     }
     if ($record) {
-      $form[$name] = $message;
+      // Set the error in the element, such that the element can render it.
+      if ($name) {
+        $keys = explode('][', $name);
+        list($element, $element_exists) = drupal_get_array_deep($form, $keys);
+        if ($element_exists) {
+          $element['#error'] = $message;
+          drupal_set_array_deep($form, $keys, $element);
+        }
+      }
+      // Maintain a list of errors for the whole form and output the message.
+      $form_state['errors'][$name] = $message;
       if ($message) {
         drupal_set_message($message, 'error');
       }
     }
   }
-
-  return $form;
-}
-
-/**
- * Clear all errors against all form elements made by form_set_error().
- */
-function form_clear_error() {
-  drupal_static_reset('form_set_error');
 }
 
 /**
  * Return an associative array of all errors.
  */
 function form_get_errors() {
-  $form = form_set_error();
-  if (!empty($form)) {
-    return $form;
+  $static = &drupal_get_processed_form();
+  if ($form_state = &$static[1]) {
+    return $form_state['errors'];
   }
 }
 
@@ -1318,14 +1349,16 @@ function form_get_errors() {
  * Return the error message filed against the form with the specified name.
  */
 function form_get_error($element) {
-  $form = form_set_error();
-  $key = $element['#parents'][0];
-  if (isset($form[$key])) {
-    return $form[$key];
-  }
-  $key = implode('][', $element['#parents']);
-  if (isset($form[$key])) {
-    return $form[$key];
+  $static = &drupal_get_processed_form();
+  if ($form_state = &$static[1]) {
+    $key = $element['#parents'][0];
+    if (isset($form_state['errors'][$key])) {
+      return $form_state['errors'][$key];
+    }
+    $key = implode('][', $element['#parents']);
+    if (isset($form_state['errors'][$key])) {
+      return $form_state['errors'][$key];
+    }
   }
 }
 
@@ -3313,7 +3346,7 @@ function _form_set_class(&$element, $class = array()) {
   if ($element['#required']) {
     $element['#attributes']['class'][] = 'required';
   }
-  if (form_get_error($element)) {
+  if (isset($element['#error'])) {
     $element['#attributes']['class'][] = 'error';
   }
 }
