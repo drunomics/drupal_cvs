@@ -909,7 +909,7 @@ function drupal_validate_form($form_id, &$form, &$form_state) {
   // If the session token was set by drupal_prepare_form(), ensure that it
   // matches the current user's session.
   if (isset($form['#token'])) {
-    if (!drupal_valid_token($form['form_token']['#value'], $form['#token'])) {
+    if (!drupal_valid_token($form_state['values']['form_token'], $form['#token'])) {
       // Setting this error will cause the form to fail validation.
       form_set_error('form_token', t('Validation error, please try again. If this error persists, please contact the site administrator.'));
     }
