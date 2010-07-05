@@ -917,6 +917,23 @@ function drupal_validate_form($form_id, &$form, &$form_state) {
 
   _form_validate($form, $form_state, $form_id);
   $validated_forms[$form_id] = TRUE;
+
+  // If validation errors are limited remove any not validated form values, so
+  // that only values that passed validation are left for submit callbacks.
+  if (isset($form_state['triggering_element']['#limit_validation_errors']) && $form_state['triggering_element']['#limit_validation_errors'] !== FALSE) {
+    $values = array();
+    foreach ($form_state['triggering_element']['#limit_validation_errors'] as $section) {
+      list($value, $value_exists) = drupal_get_array_deep($form_state['values'], $section);
+      if ($value_exists) {
+        drupal_set_array_deep($values, $section, $value);
+      }
+    }
+    // For convenience we always make the value of pressed buttons available.
+    if (isset($form_state['triggering_element']['#button_type'])) {
+      $values[$form_state['triggering_element']['#name']] = $form_state['triggering_element']['#value'];
+    }
+    $form_state['values'] = $values;
+  }
 }
 
 /**
@@ -1575,19 +1592,6 @@ function form_builder($form_id, $element, &$form_state) {
     // state key that's needed for those handlers to run.
     if (!empty($form_state['triggering_element']['#executes_submit_callback'])) {
       $form_state['submitted'] = TRUE;
-    }
-
-    // If validation errors are limited make sure there are no unvalidated
-    // values left in the the form values.
-    if (isset($form_state['triggering_element']['#limit_validation_errors']) && $form_state['triggering_element']['#limit_validation_errors'] !== FALSE) {
-      $values = array();
-      foreach ($form_state['triggering_element']['#limit_validation_errors'] as $sections) {
-        list($value, $value_exists) = drupal_get_array_deep($form_state['values'], $sections);
-        if ($value_exists) {
-          drupal_set_array_deep($values, $sections, $value);
-        }
-      }
-      $form_state['values'] = $values;
     }
 
     // Special processing if the triggering element is a button.
