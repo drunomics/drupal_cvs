@@ -922,15 +922,17 @@ function drupal_validate_form($form_id, &$form, &$form_state) {
   // that only values that passed validation are left for submit callbacks.
   if (isset($form_state['triggering_element']['#limit_validation_errors']) && $form_state['triggering_element']['#limit_validation_errors'] !== FALSE) {
     $values = array();
+    // For convenience we always make the form values of pressed buttons
+    // available.
+    if (isset($form_state['triggering_element']['#button_type'])) {
+      $values[$form_state['triggering_element']['#name']] = $form_state['triggering_element']['#value'];
+      $form_state['triggering_element']['#limit_validation_errors'][] = $form_state['triggering_element']['#parents'];
+    }
     foreach ($form_state['triggering_element']['#limit_validation_errors'] as $section) {
       list($value, $value_exists) = drupal_get_array_deep($form_state['values'], $section);
       if ($value_exists) {
         drupal_set_array_deep($values, $section, $value);
       }
-    }
-    // For convenience we always make the value of pressed buttons available.
-    if (isset($form_state['triggering_element']['#button_type'])) {
-      $values[$form_state['triggering_element']['#name']] = $form_state['triggering_element']['#value'];
     }
     $form_state['values'] = $values;
   }
@@ -1761,11 +1763,8 @@ function _form_builder_handle_input_element($form_id, &$element, &$form_state) {
 
   // Set the element's value in $form_state['values'], but only, if its key
   // does not exist yet (a #value_callback may have already populated it).
-  $values = $form_state['values'];
-  foreach ($element['#parents'] as $key) {
-    $values = (isset($values[$key]) ? $values[$key] : NULL);
-  }
-  if (!isset($values)) {
+  list($values, $value_exists) = drupal_get_array_deep($form_state['values'], $element['#parents']);
+  if (!$value_exists) {
     form_set_value($element, $element['#value'], $form_state);
   }
 }
