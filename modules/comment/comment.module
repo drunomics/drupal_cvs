@@ -1965,6 +1965,7 @@ function comment_form($form, &$form_state, $comment) {
   // Attach fields.
   $comment->node_type = 'comment_node_' . $node->type;
   $form['#builder_function'] = 'comment_form_submit_build_comment';
+  $form['#builder'][] = 'entity_form_submit_build_entity';
   field_attach_form('comment', $comment, $form, $form_state);
 
   return $form;
@@ -2142,9 +2143,11 @@ function comment_submit($comment) {
  */
 function comment_form_submit_build_comment($form, &$form_state) {
   $comment = $form_state['comment'];
-  entity_form_submit_build_entity('comment', $comment, $form, $form_state);
-  comment_submit($comment);
-  return $comment;
+  // Invoke all specified builders for copying form values to entity properties.
+  foreach ($form['#builder'] as $function) {
+    $function('comment', $comment, $form, $form_state);
+  }
+  return comment_submit($comment);
 }
 
 /**
