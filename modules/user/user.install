@@ -473,6 +473,7 @@ function user_update_7002(&$sandbox) {
     }
   }
 }
+
 /**
  * Update user settings for cancelling user accounts.
  *
