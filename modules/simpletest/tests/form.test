@@ -325,7 +325,7 @@ class FormValidationTestCase extends DrupalWebTestCase {
     $this->assertText('Test element is invalid');
 
     // Ensure not validated values are not available to submit handlers.
-    $this->drupalPost($path, array('test' => 'valid'), t('Partial validate'));
+    $this->drupalPost($path, array('title' => '', 'test' => 'valid'), t('Partial validate'));
     $this->assertText('Only validated values appear in the form values.');
 
     // Now test full form validation and ensure that the #element_validate

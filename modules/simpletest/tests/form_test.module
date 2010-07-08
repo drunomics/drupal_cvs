@@ -319,6 +319,8 @@ function form_test_limit_validation_errors_element_validate_test(&$element, &$fo
  * Form submit handler for the partial validation submit button.
  */
 function form_test_limit_validation_errors_form_partial_submit($form, $form_state) {
+  // The title has not been validated, thus its value - in case of the test case
+  // an empty string - may not be set.
   if (!isset($form_state['values']['title']) && isset($form_state['values']['test'])) {
     drupal_set_message('Only validated values appear in the form values.');
   }
