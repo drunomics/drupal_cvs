@@ -6686,18 +6686,21 @@ function entity_form_field_validate($entity_type, $form, &$form_state) {
  * During the submission handling of an entity form's "Save", "Preview", and
  * possibly other buttons, the form state's entity needs to be updated with the
  * submitted form values. Each entity form implements its own
- * $form['#builder_function'], which passes the currently edited entity to all
- * in $form['#builder'] specified build handlers for doing this as appropriate
- * for the particular entity and form.
- * This helper function may be added as $form['#builder'] to re-use its logic
- * of copying $form_state['values'][PROPERTY] values to $entity->PROPERTY for
- * all entries in $form_state['values'] that are not field data, and calling
- * field_attach_submit() to copy field data. Still modules may add further
- * #builder in order to adjust this default behavior.
+ * $form['#builder_function'] for doing this, appropriate for the particular
+ * entity and form, whereas modules may specify additional builder functions
+ * in $form['#builder'] for copying the form values of added form elements to
+ * entity properties.
+ * Many of the main entity builder functions can call this helper
+ * function to re-use its logic of copying $form_state['values'][PROPERTY]
+ * values to $entity->PROPERTY for all entries in $form_state['values'] that are
+ * not field data, and calling field_attach_submit() to copy field data. Also
+ * this helper invokes any additional, in $form['#builder'] specified builder
+ * functions.
  *
  * For some entity forms (e.g., forms with complex non-field data and forms that
- * simultaneously edit multiple entities), this helper may be inappropriate,
- * so for such forms an alternative #builder can be utilized.
+ * simultaneously edit multiple entities), this behavior may be inappropriate,
+ * so the #builder_function for such forms needs to implement the required
+ * functionality instead of calling this function.
  */
 function entity_form_submit_build_entity($entity_type, $entity, $form, &$form_state) {
   $info = entity_get_info($entity_type);
@@ -6709,6 +6712,13 @@ function entity_form_submit_build_entity($entity_type, $entity, $form, &$form_st
   $values_excluding_fields = $info['fieldable'] ? array_diff_key($form_state['values'], field_info_instances($entity_type, $bundle)) : $form_state['values'];
   foreach ($values_excluding_fields as $key => $value) {
     $entity->$key = $value;
+  }
+
+  // Invoke all specified builders for copying form values to entity properties.
+  if (isset($form['#builder'])) {
+    foreach ($form['#builder'] as $function) {
+      $function($entity_type, $entity, $form, $form_state);
+    }
   }
 
   // Copy field values to the entity.
