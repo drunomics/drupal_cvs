@@ -922,17 +922,17 @@ function drupal_validate_form($form_id, &$form, &$form_state) {
   // that only values that passed validation are left for submit callbacks.
   if (isset($form_state['triggering_element']['#limit_validation_errors']) && $form_state['triggering_element']['#limit_validation_errors'] !== FALSE) {
     $values = array();
-    // For convenience we always make the form values of pressed buttons
-    // available.
-    if (isset($form_state['triggering_element']['#button_type'])) {
-      $values[$form_state['triggering_element']['#name']] = $form_state['triggering_element']['#value'];
-      $form_state['triggering_element']['#limit_validation_errors'][] = $form_state['triggering_element']['#parents'];
-    }
     foreach ($form_state['triggering_element']['#limit_validation_errors'] as $section) {
       list($value, $value_exists) = drupal_get_array_deep($form_state['values'], $section);
       if ($value_exists) {
         drupal_set_array_deep($values, $section, $value);
       }
+    }
+    // For convenience we always make the form values of pressed buttons
+    // available.
+    if (isset($form_state['triggering_element']['#button_type'])) {
+      $values[$form_state['triggering_element']['#name']] = $form_state['triggering_element']['#value'];
+      drupal_set_array_deep($values, $form_state['triggering_element']['#parents'], $form_state['triggering_element']['#value']);
     }
     $form_state['values'] = $values;
   }
