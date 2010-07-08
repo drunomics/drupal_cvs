@@ -5542,16 +5542,14 @@ function element_get_visible_children(array $elements) {
  *   The value to set.
  */
 function drupal_set_array_deep(&$array, $parents, $value) {
-  $parent = array_shift($parents);
-  if (empty($parents)) {
-    $array[$parent] = $value;
-  }
-  else {
-    if (!isset($array[$parent])) {
-      $array[$parent] = array();
+  $ref = &$array;
+  foreach ($parents as $parent) {
+    if (!isset($ref[$parent])) {
+      $ref[$parent] = array();
     }
-    drupal_set_array_deep($array[$parent], $parents, $value);
+    $ref = &$ref[$parent];
   }
+  $ref = $value;
 }
 
 /**
@@ -5567,16 +5565,15 @@ function drupal_set_array_deep(&$array, $parents, $value) {
  *   flag is returned, which determines whether all given parent keys are set.
  */
 function drupal_get_array_deep($array, $parents) {
-  $parent = array_shift($parents);
-  if (array_key_exists($parent, $array)) {
-    if (empty($parents)) {
-      return array($array[$parent], TRUE);
+  foreach ($parents as $parent) {
+    if (isset($array[$parent])) {
+      $array = $array[$parent];
     }
-    if (is_array($array[$parent])) {
-      return drupal_get_array_deep($array[$parent], $parents);
+    else {
+      return array(NULL, FALSE);
     }
   }
-  return array(NULL, FALSE);
+  return array($array, TRUE);
 }
 
 /**
