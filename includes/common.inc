@@ -5532,14 +5532,19 @@ function element_get_visible_children(array $elements) {
 }
 
 /**
- * Sets a value in a deeply nested array.
+ * Sets a value in a nested array.
+ *
+ * Example: if $array is array('a' => 1, 'b' => array('c' => 3, 'd' => 4)), and
+ * $parents is array('b', 'c'), then the 3 will be replaced by $value.
  *
  * @param $array
  *   A reference to the array to modify.
  * @param $parents
- *   An ordered array of parent keys, starting with the outer most entry.
+ *   An array of parent keys, starting with the outermost key.
  * @param $value
  *   The value to set.
+ *
+ * @see drupal_get_array_deep()
  */
 function drupal_set_array_deep(&$array, $parents, $value) {
   $ref = &$array;
@@ -5552,17 +5557,22 @@ function drupal_set_array_deep(&$array, $parents, $value) {
 }
 
 /**
- * Gets a value sitting in a deeply nested array.
+ * Retrieves a value from a nested array.
+ *
+ * Example: if $array is array('a' => 1, 'b' => array('c' => 3, 'd' => 4)), and
+ * $parents is array('b', 'c'), then the return value will be array(3, TRUE).
  *
  * @param $array
- *   The array from which to get a value.
+ *   The array from which to get the value.
  * @param $parents
- *   An ordered array of parent keys of the value, starting with the outer most
- *   entry.
+ *   An array of parent keys of the value, starting with the outermost key.
  *
  * @return
- *   An array with the first entry being the value. As second entry a boolean
- *   flag is returned, which determines whether all given parent keys exist.
+ *   An array whose first entry is the array value, and whose second entry is
+ *   TRUE if all the parent keys existed, and FALSE if not (in which case the
+ *   value element will be NULL).
+ *
+ * @see drupal_set_array_deep()
  */
 function drupal_get_array_deep($array, $parents) {
   foreach ($parents as $parent) {
