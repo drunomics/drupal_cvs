@@ -5540,16 +5540,23 @@ function element_get_visible_children(array $elements) {
  *   An ordered array of parent keys, starting with the outer most entry.
  * @param $value
  *   The value to set.
+ *
+ * @return
+ *   TRUE if the value was successfully set, else FALSE.
  */
 function drupal_set_array_deep(&$array, $parents, $value) {
   $ref = &$array;
   foreach ($parents as $parent) {
+    if (!is_array($ref)) {
+      return FALSE;
+    }
     if (!isset($ref[$parent])) {
       $ref[$parent] = array();
     }
     $ref = &$ref[$parent];
   }
   $ref = $value;
+  return TRUE;
 }
 
 /**
@@ -5560,9 +5567,10 @@ function drupal_set_array_deep(&$array, $parents, $value) {
  * @param $parents
  *   An ordered array of parent keys of the value, starting with the outer most
  *   entry.
+ *
  * @return
  *   An array with the first entry being the value. As second entry a boolean
- *   flag is returned, which determines whether all given parent keys are set.
+ *   flag is returned, which determines whether all given parent keys exist.
  */
 function drupal_get_array_deep($array, $parents) {
   foreach ($parents as $parent) {
