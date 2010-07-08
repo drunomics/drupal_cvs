@@ -918,8 +918,8 @@ function drupal_validate_form($form_id, &$form, &$form_state) {
   _form_validate($form, $form_state, $form_id);
   $validated_forms[$form_id] = TRUE;
 
-  // If validation errors are limited remove any not validated form values, so
-  // that only values that passed validation are left for submit callbacks.
+  // If validation errors are limited then remove any non validated form values,
+  // so that only values that passed validation are left for submit callbacks.
   if (isset($form_state['triggering_element']['#limit_validation_errors']) && $form_state['triggering_element']['#limit_validation_errors'] !== FALSE) {
     $values = array();
     foreach ($form_state['triggering_element']['#limit_validation_errors'] as $section) {
@@ -928,8 +928,7 @@ function drupal_validate_form($form_id, &$form, &$form_state) {
         drupal_set_array_deep($values, $section, $value);
       }
     }
-    // For convenience we always make the form values of pressed buttons
-    // available.
+    // For convenience we always make the value of the pressed button available.
     if (isset($form_state['triggering_element']['#button_type'])) {
       $values[$form_state['triggering_element']['#name']] = $form_state['triggering_element']['#value'];
       drupal_set_array_deep($values, $form_state['triggering_element']['#parents'], $form_state['triggering_element']['#value']);
