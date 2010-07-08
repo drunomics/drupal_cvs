@@ -5549,7 +5549,6 @@ function drupal_set_array_deep(&$array, $parents, $value) {
     $ref = &$ref[$parent];
   }
   $ref = $value;
-  return TRUE;
 }
 
 /**
