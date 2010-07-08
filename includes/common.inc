@@ -5540,19 +5540,12 @@ function element_get_visible_children(array $elements) {
  *   An ordered array of parent keys, starting with the outer most entry.
  * @param $value
  *   The value to set.
- *
- * @return
- *   TRUE if the value was successfully set, else FALSE.
  */
 function drupal_set_array_deep(&$array, $parents, $value) {
   $ref = &$array;
   foreach ($parents as $parent) {
-    if (!is_array($ref)) {
-      return FALSE;
-    }
-    if (!isset($ref[$parent])) {
-      $ref[$parent] = array();
-    }
+    // Note that PHP is fine with referencing a not existing array key - in this
+    // case it just creates an entry with NULL as value.
     $ref = &$ref[$parent];
   }
   $ref = $value;
