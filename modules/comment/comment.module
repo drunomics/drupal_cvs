@@ -2141,8 +2141,10 @@ function comment_submit($comment) {
  * @see comment_form()
  */
 function comment_form_submit_build_comment($form, &$form_state) {
-  entity_form_submit_build_entity('comment', $form_state['comment'], $form, $form_state);
-  return comment_submit($form_state['comment']);
+  $comment = $form_state['comment'];
+  entity_form_submit_build_entity('comment', $comment, $form, $form_state);
+  comment_submit($comment);
+  return $comment;
 }
 
 /**
